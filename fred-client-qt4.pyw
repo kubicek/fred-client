@@ -16,11 +16,17 @@
 #    You should have received a copy of the GNU General Public License
 #    along with FredClient; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-import sys
+import sys, os
+
+old_cwd = os.getcwd()
+try:
+    os.chdir(os.path.dirname(sys.argv[0]))
+except OSError:
+    pass
 
 # setup.py will change this path to reflect changes in prefix
 # and/or root option during install
-sys.path.insert(0, '')
+sys.path.insert(0, '.')
 
 import fred
 from fred.translate import encoding, options, option_errors
@@ -63,4 +69,6 @@ if __name__ == '__main__':
         if option_errors:
             print option_errors
         else:
-            main([], options['lang'])
+            main([], options['lang'], os.getcwd(), options)
+
+    os.chdir(old_cwd)

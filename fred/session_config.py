@@ -21,6 +21,7 @@ It is used by session manager in session_base.py.
 """
 import os, sys, re
 import ConfigParser
+import pdb
 from translate import get_valid_lang
 
 def load_config_from_file(filename, verbose):
@@ -46,19 +47,25 @@ def get_etc_config_name(name=''):
     'Returns shared folder depends on OS type.'
     if os.name == 'posix':
         # this line will be changed during setup process
-        glob_conf = ''
+        glob_conf = 'conf/fred-client.conf'
         if glob_conf == '':
-            glob_conf = os.path.join('/etc/fred', name)
+            glob_conf = os.path.join('/etc/fred', name.strip('.'))
     else:
         # ALLUSERSPROFILE = C:\Documents and Settings\All Users
         glob_conf = os.path.join(os.path.expandvars('$ALLUSERSPROFILE'),name)
     return glob_conf
-    
+
 def load_default_config(config_name, verbose):
     'Load default config. First try home than etc.'
     config = ConfigParser.SafeConfigParser()
     # first try home
     missing = []
+
+    # ugly HACK: part of next code line is changed during ``setup.py bdist_simple'':
+    #   This part -> ``os.path.join(os.path.expanduser('~'),config_name)''
+    # it is important to update regexp in InstallLib.update_session_config method (setup.py)
+    # to proper new value if mentioned part is changed (otherwise bdist simple package
+    # will load wrong (if any) configuration file). See setup.py file for some further information
     error, names, not_found = load_config(config, os.path.join(os.path.expanduser('~'),config_name), verbose)
     if not_found:
         missing.extend(not_found)
@@ -113,6 +120,9 @@ def main(config_name, options, verbose, OMIT_ERROR):
     errors = []
     if options.has_key('config') and len(options['config']):
         config, config_error, missing, config_names = load_config_from_file(options['config'], verbose)
+        if missing:
+            # always display error message when explicit config missing
+            errors.extend(missing)
     else:
         config, config_error, missing, config_names = load_default_config(config_name, verbose)
     if len(config_error): errors.append(config_error)

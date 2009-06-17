@@ -58,6 +58,19 @@ try:
     from freddist.command.bdist_rpm import bdist_rpm
 except ImportError:
     from command.bdist_rpm import bdist_rpm
+try:
+    from freddist.command.bdist_wininst import bdist_wininst
+except ImportError:
+    from command.bdist_wininst import bdist_wininst
+
+# try:
+    # from freddist.command.bdist_dumb import bdist_dumb
+# except ImportError:
+    # from command.bdist_dumb import bdist_dumb
+try:
+    from freddist.command.bdist_simple import bdist_simple
+except ImportError:
+    from command.bdist_simple import bdist_simple
 
 try:
     from freddist.command.clean import clean
@@ -101,6 +114,12 @@ class Distribution(_Distribution):
             self.cmdclass['bdist'] = bdist
         if not self.cmdclass.get('bdist_rpm'):
             self.cmdclass['bdist_rpm'] = bdist_rpm
+        if not self.cmdclass.get('bdist_wininst'):
+            self.cmdclass['bdist_wininst'] = bdist_wininst
+        # if not self.cmdclass.get('bdist_dumb'):
+            # self.cmdclass['bdist_dumb'] = bdist_dumb
+        if not self.cmdclass.get('bdist_simple'):
+            self.cmdclass['bdist_simple'] = bdist_simple
         if not self.cmdclass.get('clean'):
             self.cmdclass['clean'] = clean
         if not self.cmdclass.get('uninstall'):

@@ -42,11 +42,12 @@ import StringIO
 # Defaults - can overwrite by values from config or command line option
 #========================================================
 SCHEMA_PREFIX = 'http://www.nic.cz/xml/epp/'
-VERSION_CONTACT  = '1.4'
-VERSION_DOMAIN   = '1.3'
+VERSION_CONTACT  = '1.5'
+VERSION_DOMAIN   = '1.4'
 VERSION_NSSET    = '1.2'
+VERSION_KEYSET   = '1.2'
 VERSION_ENUMVAL  = '1.1'
-VERSION_FRED     = '1.2'
+VERSION_FRED     = '1.4'
 VERSION_VERSION  = '1.0'
 
 obj_uri = "urn:ietf:params:xml:ns:"
@@ -69,11 +70,12 @@ class Message:
         self._handle_ID = '' # keep object handle (ID)
         self.schema_version = {
             'contact': VERSION_CONTACT, 
-            'nsset':     VERSION_NSSET, 
-            'domain':   VERSION_DOMAIN, 
-            'enum':       VERSION_ENUMVAL, 
-            'fred':       VERSION_FRED, 
-            'epp':         VERSION_VERSION,
+            'nsset':   VERSION_NSSET, 
+            'keyset':  VERSION_KEYSET, 
+            'domain':  VERSION_DOMAIN, 
+            'enum':    VERSION_ENUMVAL, 
+            'fred':    VERSION_FRED, 
+            'epp':     VERSION_VERSION,
         }
         self.set_schema_version('epp', VERSION_VERSION)
         self.getresults_loop = 0 # indicate if client starts messages loop
@@ -91,7 +93,8 @@ class Message:
 
     def get_objURI(self):
         'Returns the list of the objURI namesapces.'
-        return ['%s%s-%s'%(SCHEMA_PREFIX, name, self.schema_version[name]) for name in ('contact','nsset','domain',)]
+        return ['%s%s-%s'%(SCHEMA_PREFIX, name, self.schema_version[name]) 
+                    for name in ('contact','nsset','domain', 'keyset')]
 
 
     def get_extURI(self):
@@ -231,6 +234,8 @@ class Message:
         else:
             master.appendChild(node)
         if value:
+            # strip backslashes before ' and " and \\
+            value = value.replace(r"\'", "'").replace(r'\"', '"').replace(r'\\ '[:-1], r'\ '[:-1])
             try:
                 node.appendChild(self.dom.createTextNode(value))
             except TypeError, msg:

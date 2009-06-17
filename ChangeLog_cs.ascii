@@ -1,3 +1,36 @@
+FredClient 2.1.1
+
+Zmeny:
+    * Oprava escapovani apostrofu v retezcich
+    * Drobna vylepseni v instalacni procedure
+
+FredClient 2.1.0
+
+Zmeny:
+    * Upravy create_keyset a update_keyset pro pridani dnskey
+    * Pridano alternativni vkladani DS a DNSKEY zaznamu pomoci odakzu do douboru
+
+
+FredClient 2.0.2
+
+Zmeny:
+    * Oprava kodovani cestiny pri volbe --output=php
+
+Opravy:
+    * Oprava hodnot v API slovniku "data", kde byl seznam interpretovan jako string s entry.
+      (shodne s verzi 1.5.3)
+
+FredClient 2.0.1
+
+Zmeny:
+    * Pridana kontrola na verzi schemat pro objekt KeySet
+
+FredClient 2.0.0
+
+Nove funkce:
+    * Pridany funkce manipulujici s objektem KeySet
+    * Upraveny funkce na manipulaci s domenou umoznujici pripojit KeySet  
+
 FredClient 1.5.4
 
 Nove funkce:
@@ -191,5 +224,4 @@ Opravy:
     * dopleni chybejici hodnoty domain:valExDate (Validace platna do) v info_domain
     * oprava ukladani historie prikazu
     * oprava parsovani hodnoty pojmenovaneho parametru
-
 

@@ -28,11 +28,13 @@ import time
 import ConfigParser
 import cmd_parser
 import session_base
+
 from translate import encoding
 from eppdoc import Message as MessageBase, SCHEMA_PREFIX
 
 
 UNBOUNDED = None
+MAXLIST = 9
 # ''contact_disclose'' must be same format as eppdoc_client.update_status.
 DISCLOSES = ('voice','fax','email', 'vat', 'ident', 'notify_email')
 contact_disclose = map(lambda n: (n,), DISCLOSES)
@@ -539,7 +541,7 @@ class Message(MessageBase):
                 data.append((parent_node_name,node_name,'',((attr_name,dct[key]),)))
 
     def __append_values__(self, data, dct, key, parent_node_name, node_name):
-        'Support function for assembel_create_... functions.'
+        'Support function for assemble_create_... functions.'
         if dct.has_key(key):
             if type(dct[key]) == list:
                 for item in dct[key]:
@@ -603,7 +605,10 @@ class Message(MessageBase):
             )),
             ('%s:extcommand'%namespace, '%s:%s'%(namespace,cols[0]))
             ]
-            if key:
+            if key == 'ds':
+                for ds in self._dct['ds']:
+                    self.__append_keyset__(cols[0], data, ds, namespace, 'keyset')
+            elif key:
                 if type(key) not in (list,tuple): key = (key,)
                 for key_name in key:
                     names = self._dct.get(key_name)
@@ -710,6 +715,9 @@ class Message(MessageBase):
     def assemble_check_nsset(self, *params):
         self.__asseble_command__(('check','nsset','id'), 'name', params)
 
+    def assemble_check_keyset(self, *params):
+        self.__asseble_command__(('check','keyset','id'), 'name', params)
+        
     def assemble_info_contact(self, *params):
         self.__asseble_command__(('info','contact','id'), 'name', params)
 
@@ -719,6 +727,9 @@ class Message(MessageBase):
     def assemble_info_nsset(self, *params):
         self.__asseble_command__(('info','nsset','id'), 'name', params)
 
+    def assemble_info_keyset(self, *params):
+        self.__asseble_command__(('info','keyset','id'), 'name', params)
+        
     def assemble_list_contacts(self, *params):
         self.getresults_loop = 1 # run messages loop
         self.__asseble_extcommand__(('listContacts', ), params)
@@ -731,6 +742,10 @@ class Message(MessageBase):
         self.getresults_loop = 1 # run messages loop
         self.__asseble_extcommand__(('listNssets', ), params)
 
+    def assemble_list_keysets(self, *params):
+        self.getresults_loop = 1 # run messages loop
+        self.__asseble_extcommand__(('listKeysets', ), params)
+    
 
     def assemble_poll(self, *params):
         op = self._dct.get('op',['req'])[0]
@@ -758,6 +773,9 @@ class Message(MessageBase):
     def assemble_delete_nsset(self, *params):
         self.__asseble_command__(('delete','nsset','id'), 'id', params)
 
+    def assemble_delete_keyset(self, *params):
+        self.__asseble_command__(('delete','keyset','id'), 'id', params)
+
 
     def __assemble_transfer__(self, names, params):
         "Assemble transfer XML EPP command."
@@ -784,6 +802,9 @@ class Message(MessageBase):
     def assemble_transfer_nsset(self, *params):
         self.__assemble_transfer__(('nsset','id'),params)
 
+    def assemble_transfer_keyset(self, *params):
+        self.__assemble_transfer__(('keyset','id'),params)
+        
     #-------------------------------------------
     # Executives
     #-------------------------------------------
@@ -885,6 +906,7 @@ class Message(MessageBase):
             if not __has_key__(period,'unit'): period['unit']=('y',)
             data.append(('domain:create','domain:period',period['num'][0], (('unit',period['unit'][0]),)))
         if __has_key__(dct,'nsset'): data.append(('domain:create','domain:nsset',dct['nsset'][0]))
+        if __has_key__(dct,'keyset'): data.append(('domain:create','domain:keyset',dct['keyset'][0]))
         if __has_key__(dct,'registrant'): data.append(('domain:create','domain:registrant',dct['registrant'][0]))
         self.__append_values__(data, dct, 'admin', 'domain:create', 'domain:admin')
         if dct.has_key('auth_info'):
@@ -901,33 +923,177 @@ class Message(MessageBase):
         if dct_ns.has_key('addr'):
             for addr in dct_ns['addr']:
                 data.append(('nsset:ns', 'nsset:addr',addr))
+
+    def __append_schema_location__(self, tag_name, data, element, prefix, change_namespace):
+        "Append namespace"
+        if change_namespace:
+            namespace = change_namespace
+            ns = (
+                ('xmlns:%s'%namespace, '%s%s-%s'%(
+                        SCHEMA_PREFIX, namespace, self.schema_version[namespace])),
+                ('xsi:schemaLocation','%s%s-%s %s-%s.xsd'%(
+                        SCHEMA_PREFIX, namespace, self.schema_version[namespace], \
+                        namespace, self.schema_version[namespace])),
+            )
+            data.append(('%s:%s'%(prefix, tag_name), element%prefix, None, ns))
+            prefix = namespace
+        else:
+            data.append(('%s:%s'%(prefix, tag_name), element%prefix))
+
+    def __append_keyset__(self, tag_name, data, dct_ks, prefix, change_namespace=None):
+        "Join ds elements for keyset"
+        element = '%s:ds'
+        parent_prefix = prefix
+        self.__append_schema_location__(tag_name, data, element, prefix, change_namespace)
+        for key in ('key_tag', 'alg', 'digest_type', 'digest'):
+            data.append((element%parent_prefix, '%s:%s'%(prefix, make_camell(key)), dct_ks[key][0]))
+        # optional
+        key = 'max_sig_life'
+        if __has_key__(dct_ks, key):
+            data.append((element%prefix, '%s:%s'%(prefix, make_camell(key)), dct_ks[key][0]))
         
-    def assemble_create_nsset(self, *params):
+    def __append_anyset_fromfile__(self, tag_name, data, filename, prefix, name, parse_file, change_namespace=None):
+        "Load anyset from filename"
+        element = '%s:' + name
+        parent_prefix = prefix
+        self.__append_schema_location__(tag_name, data, element, prefix, change_namespace)
+        dct = {}
+        for key in parse_file(dct, filename):
+            data.append((element%parent_prefix, '%s:%s'%(prefix, make_camell(key)), dct[key]))
+        
+    def __append_keyset_fromfile__(self, tag_name, data, filename, prefix, change_namespace=None):
+        "Load ds from filename"
+        self.__append_anyset_fromfile__(tag_name, data, filename, prefix, 'ds', self.parse_ds_file, change_namespace)
+
+    def __append_dnskey__(self, tag_name, data, dct_ks, prefix, change_namespace=None):
+        "Join ds elements for keyset"
+        element = '%s:dnskey'
+        parent_prefix = prefix
+        self.__append_schema_location__(tag_name, data, element, prefix, change_namespace)
+        for key in ('flags', 'protocol', 'alg', 'pub_key'):
+            data.append((element%parent_prefix, '%s:%s'%(prefix, make_camell(key)), dct_ks[key][0]))
+
+    def __append_dnskey_fromfile__(self, tag_name, data, filename, prefix, change_namespace=None):
+        "Load dnskey from filename"
+        self.__append_anyset_fromfile__(tag_name, data, filename, prefix, 'dnskey', self.parse_dnskey_file, change_namespace)
+
+
+    def load_filename(self, filename):
+        "Load file"
+        # create absolute path
+        if filename[0] != '/':
+            filename = os.path.join(os.getcwd(), filename)
+        # load certificate
+        try:
+            body = open(filename, 'rb').read()
+        except IOError, e:
+            self.errors.append((0, 'file', 'IOError: %s'%e))
+            body =  ''
+        return body.strip()
+    
+    def parse_dnskey_file(self, dct, filename):
+        "Parse certificate file"
+        # data format:
+        # cz. IN DNSKEY 256 3 5 BASE64CODE BASE64CODE BASE64CODE...
+        parts = re.split('\s+', self.load_filename(filename))
+        if len(parts) < 7:
+            self.errors.append((0, 'dnskey file', 'Invalid DNSKEY file format.'))
+            return [] # invalid format
+        if parts[1] != 'IN' and parts[2] != 'DNSKEY':
+            self.errors.append((0, 'dnskey file', 'Invalid DNSKEY data format.'))
+            return []
+        # fill dict by data from file
+        dct['flags'] = parts[3]
+        dct['protocol'] = parts[4]
+        dct['alg'] = parts[5]
+        dct['pub_key'] = '\n'.join(parts[6:])
+        return ('flags', 'protocol', 'alg', 'pub_key')
+
+    def parse_ds_file(self, dct, filename):
+        "Parse certificate file"
+        # data format:
+        # cz.	3600	IN	DS	20487 5 1 1ff4b01e82cd41f2edb65b925d3f4b2ab68a4467
+        parts = re.split('\s+', self.load_filename(filename))
+        if len(parts) != 8:
+            self.errors.append((0, 'ds file', 'Invalid DS file format.'))
+            return [] # invalid format
+        if parts[2] != 'IN' and parts[3] != 'DS':
+            self.errors.append((0, 'ds file', 'Invalid DS data format.'))
+            return []
+        # fill dict by data from file
+        dct['key_tag'] = parts[4]
+        dct['alg'] = parts[5]
+        dct['digest_type'] = parts[6]
+        dct['digest'] = parts[7]
+        dct['max_sig_life'] = parts[1]
+        return ('key_tag', 'alg', 'digest_type', 'digest', 'max_sig_life')
+        
+    
+    def __assemble_create_anyset__(self, prefix, *params):
         "Assemble XML EPP command."
         dct = self._dct
         self._handle_ID = dct['id'][0] # keep object handle (ID)
-        names = ('nsset',)
-        ns = '%s%s-%s'%(SCHEMA_PREFIX, names[0], self.schema_version['nsset'])
+        names = (prefix,)
+        ns = '%s%s-%s'%(SCHEMA_PREFIX, names[0], self.schema_version[prefix])
         attr = (('xmlns:%s'%names[0],ns),
-                ('xsi:schemaLocation','%s %s-%s.xsd'%(ns,names[0], self.schema_version['nsset'])))
+                ('xsi:schemaLocation','%s %s-%s.xsd'%(ns,names[0], self.schema_version[prefix])))
         data = [
             ('epp', 'command'),
             ('command', 'create'),
-            ('create', 'nsset:create', '', attr),
-            ('nsset:create','nsset:id', dct['id'][0])]
-        # ns records
+            ('create', '%s:create'%prefix, '', attr),
+            ('%s:create'%prefix, '%s:id'%prefix, dct['id'][0])]
+        # for nsset only
+        nsset_type = False
         if __has_key__(dct,'dns'):
+            nsset_type = True
             for dns in dct['dns']:
                 self.__append_nsset__('create', data, dns)
+        
+        # for keyset only
+        count_ds = 0
+        if __has_key__(dct,'ds'):
+            for ds in dct['ds']:
+                self.__append_keyset__('create', data, ds, prefix)
+                count_ds += 1
+        if __has_key__(dct,'dsref'):
+            for ds in dct['dsref']:
+                self.__append_keyset_fromfile__('create', data, ds, prefix)
+                count_ds += 1
+        
+        count_dnskey = 0
+        if __has_key__(dct,'dnskey'):
+            for ds in dct['dnskey']:
+                self.__append_dnskey__('create', data, ds, prefix)
+                count_dnskey += 1
+        if __has_key__(dct,'dnskeyref'):
+            for ds in dct['dnskeyref']:
+                self.__append_dnskey_fromfile__('create', data, ds, prefix)
+                count_dnskey += 1
+        
+        if not nsset_type:
+            # check list limits only for keyset
+            if count_ds + count_dnskey == 0:
+                self.errors.append((0, 'ds/dnskey', _T('At least one DS or DNSKEY must be set.')))
+            if count_ds > MAXLIST:
+                self.errors.append((0, 'ds', _T('Limit of list is exceeded. The maximum is %d.') % MAXLIST))
+            if count_dnskey > MAXLIST:
+                self.errors.append((0, 'dnskey', _T('Limit of list is exceeded. The maximum is %d.') % MAXLIST))
+        
+        # for nsset only
         if __has_key__(dct,'tech'):
-            self.__append_values__(data, dct, 'tech', 'nsset:create', 'nsset:tech')
+            self.__append_values__(data, dct, 'tech', '%s:create'%prefix, '%s:tech'%prefix)
         if dct.has_key('auth_info'): 
-            data.append(('nsset:create','nsset:authInfo', dct['auth_info'][0]))
-        if dct.has_key('reportlevel'): 
-            data.append(('nsset:create','nsset:reportlevel', dct['reportlevel'][0]))
+            data.append(('%s:create'%prefix,'%s:authInfo'%prefix, dct['auth_info'][0]))
         data.append(('command', 'clTRID', self._dct.get(TAG_clTRID,[params[0]])[0]))
         self.__assemble_cmd__(data)
 
+    def assemble_create_nsset(self, *params):
+        self.__assemble_create_anyset__('nsset', *params)
+
+    def assemble_create_keyset(self, *params):
+        self.__assemble_create_anyset__('keyset', *params)
+
+        
     def assemble_renew_domain(self, *params):
         """Assemble XML EPP command. 
         """
@@ -1039,6 +1205,7 @@ class Message(MessageBase):
             chg = dct['chg'][0]
             data.append(('domain:update', 'domain:chg'))
             if __has_key__(chg,'nsset'): data.append(('domain:chg','domain:nsset', chg['nsset'][0]))
+            if __has_key__(chg,'keyset'): data.append(('domain:chg','domain:keyset', chg['keyset'][0]))
             if __has_key__(chg,'registrant'): data.append(('domain:chg','domain:registrant', chg['registrant'][0]))
             if __has_key_dict__(chg,'auth_info'):
                 data.append(('domain:chg','domain:authInfo', chg['auth_info'][0]))
@@ -1046,49 +1213,117 @@ class Message(MessageBase):
         data.append(('command', 'clTRID', self._dct.get(TAG_clTRID,[params[0]])[0]))
         self.__assemble_cmd__(data)
 
-    def assemble_update_nsset(self, *params):
+    def __assemble_update_set__(self, prefix, *params):
         """Assemble XML EPP command. 
         params = ('clTRID', ...)
         """
         dct = self._dct
         self._handle_ID = dct['id'][0] # keep object handle (ID)
-        names = ('nsset',)
-        ns = '%s%s-%s'%(SCHEMA_PREFIX, names[0], self.schema_version['nsset'])
+        names = (prefix,)
+        ns = '%s%s-%s'%(SCHEMA_PREFIX, names[0], self.schema_version[prefix])
         attr = (('xmlns:%s'%names[0],ns),
-                ('xsi:schemaLocation','%s %s-%s.xsd'%(ns, names[0], self.schema_version['nsset'])))
+                ('xsi:schemaLocation','%s %s-%s.xsd'%(ns, names[0], self.schema_version[prefix])))
         data = [
             ('epp', 'command'),
             ('command', 'update'),
-            ('update', 'nsset:update', '', attr),
-            ('nsset:update','nsset:id', dct['id'][0]),
+            ('update', '%s:update'%prefix, '', attr),
+            ('%s:update'%prefix,'%s:id'%prefix, dct['id'][0]),
             ]
         if __has_key_dict__(dct,'add'):
-            data.append(('nsset:update','nsset:add'))
+            data.append(('%s:update'%prefix,'%s:add'%prefix))
             dct_add = dct['add'][0]
+            
+            # for nsset only
             if __has_key_dict__(dct_add,'dns'):
                 for dct_dns in dct_add['dns']:
                     if not __has_key__(dct_dns, 'name'): continue
-                    data.append(('nsset:add','nsset:ns'))
-                    data.append(('nsset:ns','nsset:name',dct_dns['name'][0]))
-                    self.__append_values__(data, dct_dns, 'addr', 'nsset:ns', 'nsset:addr')
-            self.__append_values__(data, dct_add, 'tech', 'nsset:add', 'nsset:tech')
+                    data.append(('%s:add'%prefix,'%s:ns'%prefix))
+                    data.append(('%s:ns'%prefix,'%s:name'%prefix,dct_dns['name'][0]))
+                    self.__append_values__(data, dct_dns, 'addr', '%s:ns'%prefix, '%s:addr'%prefix)
+            
+            # for keyset only
+            count_ds = 0
+            if __has_key_dict__(dct_add, 'ds'):
+                for ds in dct_add['ds']:
+                    self.__append_keyset__('add', data, ds, prefix)
+                    count_ds += 1
+            if __has_key_dict__(dct_add, 'dsref'):
+                for ds in dct_add['dsref']:
+                    self.__append_keyset_fromfile__('add', data, ds, prefix)
+                    count_ds += 1
+
+            # two list of dnskeys will be join together
+            count_dnskey = 0
+            if __has_key_dict__(dct_add, 'dnskey'):
+                for ds in dct_add['dnskey']:
+                    self.__append_dnskey__('add', data, ds, prefix)
+                    count_dnskey += 1
+            if __has_key_dict__(dct_add, 'dnskeyref'):
+                for ds in dct_add['dnskeyref']:
+                    self.__append_dnskey_fromfile__('add', data, ds, prefix)
+                    count_dnskey += 1
+            
+            # check list limits
+            if count_ds > MAXLIST:
+                self.errors.append((0, 'ds', _T('Limit of list is exceeded. The maximum is %d.') % MAXLIST))
+            if count_dnskey > MAXLIST:
+                self.errors.append((0, 'dnskey', _T('Limit of list is exceeded. The maximum is %d.') % MAXLIST))
+            
+            self.__append_values__(data, dct_add, 'tech', '%s:add'%prefix, '%s:tech'%prefix)
 
         if __has_key_dict__(dct,'rem'):
-            data.append(('nsset:update','nsset:rem'))
+            data.append(('%s:update'%prefix,'%s:rem'%prefix))
             dct_rem = dct['rem'][0]
-            self.__append_values__(data, dct_rem, 'name', 'nsset:rem', 'nsset:name')
-            self.__append_values__(data, dct_rem, 'tech', 'nsset:rem', 'nsset:tech')
+            
+            # for keyset only
+            count_ds = 0
+            if __has_key_dict__(dct_rem, 'ds'):
+                for ds in dct_rem['ds']:
+                    self.__append_keyset__('rem', data, ds, prefix)
+                    count_ds += 1
+            if __has_key_dict__(dct_rem, 'dsref'):
+                for ds in dct_add['dsref']:
+                    self.__append_keyset_fromfile__('rem', data, ds, prefix)
+                    count_ds += 1
+            
+            # two list of dnskeys will be join together
+            count_dnskey = 0
+            if __has_key_dict__(dct_rem, 'dnskey'):
+                for ds in dct_rem['dnskey']:
+                    self.__append_dnskey__('rem', data, ds, prefix)
+                    count_dnskey += 1
+            if __has_key_dict__(dct_rem, 'dnskeyref'):
+                for ds in dct_rem['dnskeyref']:
+                    self.__append_dnskey_fromfile__('rem', data, ds, prefix)
+                    count_dnskey += 1
+            
+            # check list limits
+            if count_ds > MAXLIST:
+                self.errors.append((0, 'ds', _T('Limit of list is exceeded. The maximum is %d.') % MAXLIST))
+            if count_dnskey > MAXLIST:
+                self.errors.append((0, 'dnskey', _T('Limit of list is exceeded. The maximum is %d.') % MAXLIST))
+            
+            # for nsset only
+            if __has_key_dict__(dct_rem, 'name'):
+                self.__append_values__(data, dct_rem, 'name', '%s:rem'%prefix, '%s:name'%prefix)
+            self.__append_values__(data, dct_rem, 'tech', '%s:rem'%prefix, '%s:tech'%prefix)
 
         if __has_key_dict__(dct,'auth_info') or __has_key_dict__(dct,'reportlevel'):
-            data.append(('nsset:update','nsset:chg'))
+            data.append(('%s:update'%prefix,'%s:chg'%prefix))
             if dct.has_key('auth_info'): 
-                data.append(('nsset:chg','nsset:authInfo', dct['auth_info'][0]))
+                data.append(('%s:chg'%prefix,'%s:authInfo'%prefix, dct['auth_info'][0]))
             if dct.has_key('reportlevel'): 
-                data.append(('nsset:chg','nsset:reportlevel', dct['reportlevel'][0]))
+                data.append(('%s:chg'%prefix,'%s:reportlevel'%prefix, dct['reportlevel'][0]))
 
         data.append(('command', 'clTRID', self._dct.get(TAG_clTRID,[params[0]])[0]))
         self.__assemble_cmd__(data)
 
+    def assemble_update_nsset(self, *params):
+        self.__assemble_update_set__('nsset', *params)
+
+    def assemble_update_keyset(self, *params):
+        self.__assemble_update_set__('keyset', *params)
+        
     def assemble_sendauthinfo_contact(self, *params):
         self.__asseble_extcommand__(('sendAuthInfo','contact','id'), params, 'id')
 
@@ -1098,6 +1333,9 @@ class Message(MessageBase):
     def assemble_sendauthinfo_nsset(self, *params):
         self.__asseble_extcommand__(('sendAuthInfo','nsset','id'), params, 'id')
 
+    def assemble_sendauthinfo_keyset(self, *params):
+        self.__asseble_extcommand__(('sendAuthInfo','keyset','id'), params, 'id')
+        
     def assemble_credit_info(self, *params):
         self.__asseble_extcommand__(('creditInfo',), params)
 
@@ -1105,34 +1343,55 @@ class Message(MessageBase):
         'Create technical_test document'
         self.__asseble_extcommand__(('test','nsset','id'), params, ('id', 'level', 'name'))
 
+    
     def assemble_prep_contacts(self, *params):
         'Create prepare_contacts document'
         self.__asseble_extcommand__(('listContacts', ), params)
+        
     def assemble_prep_domains(self, *params):
         'Create prepare_domains document'
         self.__asseble_extcommand__(('listDomains', ), params)
+        
     def assemble_prep_nssets(self, *params):
         'Create prepare_nssets document'
         self.__asseble_extcommand__(('listNssets', ), params)
         
+    def assemble_prep_keysets(self, *params):
+        'Create prepare_keysets document'
+        self.__asseble_extcommand__(('listKeysets', ), params)
+
+
+
     def assemble_get_results(self, *params):
         'Create count_list_nssets document'
         self.__asseble_extcommand__(('getResults', ), params)
 
+        
     def assemble_prep_domains_by_nsset(self, *params):
         'Create prep_domains_by_nsset document'
         self.__asseble_extcommand__(('domainsByNsset', ), params, 'id')
+
+    def assemble_prep_domains_by_keyset(self, *params):
+        'Create prep_domains_by_keyset document'
+        self.__asseble_extcommand__(('domainsByKeyset', ), params, 'id')
+
     def assemble_prep_domains_by_contact(self, *params):
         'Create prep_domains_by_contact document'
         self.__asseble_extcommand__(('domainsByContact', ), params, 'id')
+    
     def assemble_prep_nssets_by_contact(self, *params):
         'Create prep_nssets_by_contact document'
         self.__asseble_extcommand__(('nssetsByContact', ), params, 'id')
+
+    def assemble_prep_keysets_by_contact(self, *params):
+        'Create prep_keysets_by_contact document'
+        self.__asseble_extcommand__(('keysetsByContact', ), params, 'id')
+
     def assemble_prep_nssets_by_ns(self, *params):
         'Create prep_nssets_by_ns document'
         self.__asseble_extcommand__(('nssetsByNs', ), params, 'name')
+    
 
-        
     #===========================================
 
     def fetch_from_info(self, command_type, info_type, answer, null_value):

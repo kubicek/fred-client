@@ -3,7 +3,7 @@
 """Check domain for changes after updating.
 """
 import sys
-sys.path.insert(0, '')
+sys.path.insert(0, '..')
 import unittest
 import fred
 import unitest_share
@@ -112,7 +112,7 @@ class TestDomain(unittest.TestCase):
     def test_080(self):
         '6. Zalozeni nove domeny'
         d = DOMAIN
-        epp_cli.create_domain(d['name'], d['registrant'], d['auth_info'], d['nsset'], d['period'], d['contact'])
+        epp_cli.create_domain(d['name'], d['registrant'], d['auth_info'], d['nsset'], None, d['period'], d['contact'])
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
         

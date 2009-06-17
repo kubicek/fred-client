@@ -16,7 +16,7 @@
 #    along with FredClient; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-import sys, os
+import sys, os, shutil
 from distutils import log
 from freddist.core import setup
 from freddist.command.install import install
@@ -24,15 +24,18 @@ from freddist.command.install_scripts import install_scripts
 from freddist.command.install_lib import install_lib
 from freddist.command.install_data import install_data
 from freddist import file_util
+from freddist.file_util import *
 
 from fred.internal_variables import fred_version, config_name
 from fred.session_config import get_etc_config_name
 
+g_directory = ''
+
 # datarootdir/prog_name/ssl => /usr/local/share/fred-client/ssl (default)
 DEFAULT_SSL_PATH = 'ssl'
-# datarootdir/prog_name/schemas/all-1.4.xsd =>
-# /usr/local/share/fred-client/schemas/all-1.4.xsd
-DEFAULT_SCHEMAS_FILEMANE = 'schemas/all-1.4.xsd'
+# datarootdir/prog_name/schemas/all.xsd =>
+# /usr/local/share/fred-client/schemas/all.xsd
+DEFAULT_SCHEMAS_FILEMANE = 'schemas/all.xsd'
 
 APP_SCRIPTS = ['fred-client','fred-client-qt4.pyw']
 #if 'bdist_wininst' in sys.argv and '--install-script=setup_postinstall.py'
@@ -88,11 +91,9 @@ class EPPClientInstall(install):
             self.host = 'localhost'
         if not self.port:
             self.port = '700'
+        if not self.install_unittest:
+            self.install_unittest = 0
 
-        if self.install_unittest:
-            self.distribution.data_files.append(
-                    ('LIBDIR/%s/unittest' % self.distribution.get_name(), 
-                        file_util.all_files_in_2('unittest')))
         global g_install_unittest
         g_install_unittest = self.install_unittest
 
@@ -103,38 +104,70 @@ class EPPClientInstall(install):
             if not os.path.exists('build'):
                 os.makedirs('build')
             values = []
-            values.append(('FRED_CLIENT_SSL_PATH', root + os.path.join(
-                self.datarootdir, 
-                self.distribution.metadata.name, 
-                DEFAULT_SSL_PATH)))
-            values.append(('FRED_CLIENT_SCHEMAS_FILEMANE', root + os.path.join(
-                self.datarootdir, 
-                self.distribution.metadata.name, 
-                DEFAULT_SCHEMAS_FILEMANE)))
+            values.append(('FRED_CLIENT_SSL_PATH',
+                os.path.join(
+                    self.getDir_std('appdir'),
+                    DEFAULT_SSL_PATH))
+                )
+            values.append(('FRED_CLIENT_SCHEMAS_FILEMANE',
+                os.path.join(
+                    self.getDir_std('appdir'),
+                    DEFAULT_SCHEMAS_FILEMANE))
+                )
             values.append(('FRED_CLIENT_HOST', self.host))
             values.append(('FRED_CLIENT_PORT', self.port))
             self.replace_pattern(
                 os.path.join(self.srcdir, 'conf', config_name+'.install'),
                 os.path.join('build', config_name),
                 values)
+        else:
+            shutil.copyfile(
+                    os.path.join(self.srcdir, 'conf', config_name + '.install'),
+                    os.path.join('build', config_name))
         print 'File %s was created.' % config_name
 
+    def update_unittest_file(self, filename):
+        values = []
+        values.append((r'(sys\.path\.insert\(0,\ )\'[\w/_ \-\.]*\'\)', r"\1'%s')" %
+            self.getDir_std('purelibdir')))
+        self.replace_pattern(os.path.join('build', 'unittest', filename), None, values)
+        print "%s file has been updated" % filename
+
+    def update_unittests(self):
+        files = file_util.all_files_in_2(os.path.join('build', 'unittest'), onlyFilenames=True)
+        for file in files:
+            self.update_unittest_file(file)
+
     def run(self):
+        if g_install_unittest:
+            if not os.path.exists(os.path.join('build', 'unittest')):
+                os.makedirs(os.path.join('build', 'unittest'))
+            for file in all_files_in_2(os.path.join(g_directory, 'unittest')):
+                shutil.copyfile(file, os.path.join('build', 'unittest', os.path.split(file)[1]))
+
+            self.update_unittests()
+            self.distribution.data_files = self.distribution.data_files + file_util.all_files_in_4(
+                    'LIBDIR/%s/unittest' % self.distribution.get_name(),
+                    os.path.join('build', 'unittest'))
+
         self.update_fred_config()
         install.run(self)
 
 class EPPClientInstall_scripts(install_scripts):
 
     def update_fred_client(self):
-        values = [((r"(sys\.path\.insert\(0, )\'\'\)",
-            r"\1'%s')" % self.getDir('purelibdir')))]
+        values = [((r"(sys\.path\.insert\(0, )\'[\w/_ \-\.]*\'\)",
+            r"\1'%s')" % self.getDir_std('purelibdir')))]
         self.replace_pattern(os.path.join(self.build_dir, 'fred-client'),
                 None, values)
+        if os.environ.has_key('BDIST_SIMPLE'):
+            self.replace_pattern(os.path.join(self.build_dir, 'fred-client.py'),
+                    None, values)
         print "fred-client file has been updated"
 
     def update_fred_client_qt4(self):
-        values = [((r"(sys\.path\.insert\(0, )\'\'\)",
-            r"\1'%s')" % self.getDir('purelibdir')))]
+        values = [((r"(sys\.path\.insert\(0, )\'[\w/_ \-\.]*\'\)",
+            r"\1'%s')" % self.getDir_std('purelibdir')))]
         self.replace_pattern(os.path.join(self.build_dir, 'fred-client-qt4.pyw'),
                 None, values)
         print "fred-client-qt4.pyw file has been updated"
@@ -147,47 +180,34 @@ class EPPClientInstall_scripts(install_scripts):
 class Install_lib(install_lib):
     def update_session_config(self):
         filename = os.path.join(self.build_dir, 'fred', 'session_config.py')
-        values = [((
-            r"(glob_conf = )\'\'",
-            r"\1'%s'" % os.path.join(
-                self.getDir('sysconfdir'), 'fred', config_name)))]
+        # when simple package creation is in progress this enviroment variable is set to 'True'
+        if os.environ.has_key('BDIST_SIMPLE'):
+            # simple package must use as a first configuration file its own
+            # file from ``data_files'' directory, not file from user home directory
+            # nor file from /etc or any other directory.
+            values = [((
+                r"os\.path\.join\(os\.path.expanduser\(\'\~\'\),config_name\)",
+                r"'%s'" % os.path.join(
+                    self.getDir_std('sysconfdir'), 'fred', config_name)))]
+        else:
+            values = [((
+                r"(glob_conf = )\'[\w/_ \-\.]*\'",
+                r"\1'%s'" % os.path.join(
+                    self.getDir_std('sysconfdir'), 'fred', config_name)))]
         self.replace_pattern(filename, None, values)
         print "session_config.py file has been updated"
 
-    def update_session_base(self):
-        filename = os.path.join(self.build_dir, 'fred', 'session_base.py')
-        values = [((
-            r"(self\._config_name = )\'\'",
-            r"\1'%s'" % os.path.join(
-                self.getDir('sysconfdir'), 'fred', config_name)))]
-        self.replace_pattern(filename, None, values)
-        print "session_base.py file has been updated"
-
     def run(self):
         self.update_session_config()
-        self.update_session_base()
         install_lib.run(self)
 
 class Install_data(install_data):
-    def update_file(self, filename):
-        values = []
-        values.append((r'(sys\.path\.insert\(0,\ )\'\'\)',
-            r"\1'%s')" % self.getDir('purelibdir')))
-        self.replace_pattern(os.path.join(self.getDir('libdir'),
-            self.distribution.get_name(), 'unittest', filename),
-            None, values)
-        print "%s file has been updated" %filename
-
     def run(self):
         install_data.run(self)
-        # TODO unittest cannot be added into rpm package - because of
-        # update_file method don't know proper path
-        if g_install_unittest or self.is_bdist_mode:
-            files = file_util.all_files_in_2('unittest', onlyFilenames=True)
-            for file in files:
-                self.update_file(file)
 
-def main():
+def main(directory):
+    if os.environ.has_key('BDIST_SIMPLE'):
+        APP_SCRIPTS.append('fred-client.py')
     try:
         setup(name = 'fred-client',
             description = 'Client FRED (Free Registry for enum and domain)',
@@ -205,29 +225,29 @@ def main():
             },
             scripts = APP_SCRIPTS, 
             data_files=[
-                ('DATADIR/fred-client',[
+                ('DATAROOTDIR/fred-client',[
                     'doc/fred_howto_cs.html',
-                
                     'doc/niccz_console.ico', 
                     'doc/niccz_gui.ico', 
                     'doc/configure.ico',
                     'doc/help.ico',
-                    
                     'doc/README_EN.txt',
                     'doc/README_CS.txt',
                     'doc/README_CS.html',
                     'doc/README_QT4_CS.pdf']),
-                ('DATADIR/fred-client/ssl', [
+                ('DATAROOTDIR/fred-client/ssl', [
                     'fred/certificates/test-cert.pem',
                     'fred/certificates/test-key.pem']),
-                ('DATADIR/fred-client/schemas', file_util.all_files_in_2('fred/schemas')),
+                # ('DATADIR/fred-client/schemas', file_util.all_files_in_2('fred/schemas')),
                 # on posix: '/etc/fred/' 
                 # on windows:  ALLUSERSPROFILE = C:\Documents and Settings\All Users
                 # on windows if ALL... missing:  C:\Python25\ 
                 #get_etc_config_name()
                 ('SYSCONFDIR/fred', [os.path.join('build', config_name)]) 
-                ], 
-                
+                ]
+            + all_files_in_4(
+                os.path.join('DATADIR', 'fred-client', 'schemas'),
+                os.path.join(directory, 'fred', 'schemas')),
             cmdclass = {
                     'install': EPPClientInstall, 
                     'install_scripts': EPPClientInstall_scripts,
@@ -240,5 +260,23 @@ def main():
         log.error("Error: %s", e)
         return False
 if __name__ == '__main__':
-    if main():
+    g_directory = os.path.dirname(sys.argv[0])
+    filename = 'fred-client.py'
+    if 'bdist_simple' in sys.argv:
+        # when creating bdist_simple package, enviroment variable
+        # ``BDIST_SIMPLE'' must be set
+        os.environ['BDIST_SIMPLE'] = 'True'
+        # copy fred-client to fred-client.py (windows do not recognize file
+        # without .py extension as a python script)
+        shutil.copy(
+                os.path.join(g_directory, "fred-client"),
+                os.path.join(g_directory, filename));
+    print g_directory
+    if main(g_directory):
         print "All done!"
+    if os.environ.has_key('BDIST_SIMPLE'):
+        # remove now useless fred-client.py file
+        try:
+            os.remove(os.path.join(g_directory, filename))
+        except OSError:
+            pass

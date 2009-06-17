@@ -50,8 +50,9 @@ class ManagerTransfer(ManagerBase):
     Function process_answer() must be implemented by derived class.
     """
 
-    def __init__(self):
-        ManagerBase.__init__(self)
+    def __init__(self, cwd=None):
+        self._cwd = cwd
+        ManagerBase.__init__(self, cwd=self._cwd)
         self._epp_cmd = eppdoc_client.Message()
         self._epp_response = eppdoc_client.Message()
         self.defs[objURI] = self._epp_cmd.get_objURI()
@@ -165,6 +166,8 @@ class ManagerTransfer(ManagerBase):
         'Get connect defaults from config'
         if not self._conf: self.load_config() # load config, if was not been yet
         section = self.config_get_section_connect()
+        # OMIT_ERROR are used bycause these values can be set at the command line,
+        # so we will not display error messages when any value missing.
         data = [self.get_config_value(section,'host',OMIT_ERROR),
                 self.get_config_value(section,'port',OMIT_ERROR),
                 self.get_config_value(section,'ssl_key',OMIT_ERROR),
@@ -177,6 +180,14 @@ class ManagerTransfer(ManagerBase):
         # overwrite username+password by command line
         if self._epp_cmd._dct.has_key('username'): data[6] = self._epp_cmd._dct['username'][0]
         if self._epp_cmd._dct.has_key('password'): data[7] = self._epp_cmd._dct['password'][0]
+
+        # add prefix if ssl_key or/and ssl_cert paths are relative
+        ssl_key, ssl_cert = data[2], data[3]
+        if ssl_key and not os.path.isabs(ssl_key) and self.get_cwd():
+            data[2] = os.path.normpath(os.path.join(self.get_cwd(), ssl_key))
+        if ssl_cert and not os.path.isabs(ssl_cert) and self.get_cwd():
+            data[3] = os.path.normpath(os.path.join(self.get_cwd(), ssl_cert))
+
         # command options
         self._session[HOST] = data[0] # for prompt info
         return data
@@ -222,11 +233,13 @@ class ManagerTransfer(ManagerBase):
         
     def connect(self):
         "Connect transfer socket. data=(host,port,ssl_key,ssl_cert,timeout,socket,username,password)"
-        if self.is_connected(): return 1 # connection is established already
+        if self.is_connected():
+            return 1 # connection is established already
         self._lorry = client_socket.Lorry(self)
         self._lorry.handler_message = self.process_answer
         data = self.get_connect_defaults()
-        if not self.check_connect_data(data, 1): return 0 # 1 - omit username + password
+        if not self.check_connect_data(data, 1): 
+            return 0 # 1 - omit username + password
 
         success = self._lorry.connect(data, self._session[VERBOSE])
         if not success and self._lorry.try_again_with_timeout_zero:
@@ -559,11 +572,6 @@ class ManagerTransfer(ManagerBase):
                 key = key.strip() # client normaly trim whitespaces, but if you use sender, you can send everything...
                 value = dct_data.get(key,u'')
                 if value not in ('',[]):
-                    # nl2br: turnk ends of lines to HTML
-                    if type(value) not in (list, tuple):
-                        if type(value) != str:
-                            value = str(value)
-                        value = re.sub('\n', '<br/>\n', value)
                     if is_check:
                         # Tighten check response by code.
                         value = dct_data.get(key+':reason',u'')
@@ -853,19 +861,27 @@ def __append_into_report__(body, k, v, explain, ljust, indent = '', no_terminal_
         key = ljustify = ''
         patt[0] = patt[0].replace(' ', '')
     
+    key = get_ltext(key)
     if type(v) in (list,tuple):
-        if len(v):
-            # more lines: first is prefixed by column name
-            body.append(get_ltext(colored_output.render(patt[0]%(indent,key,escape(str_lists(v[0]))))))
-            # others are indented only
-            for text in v[1:]:
-                body.append(get_ltext(patt[2]%(ljustify,escape(str_lists(text)))))
+
+        if no_terminal_tags == 2:
+            # html only
+            value = escape(get_ltext(str_lists(v)))
+            body.append(get_ltext(colored_output.render(patt[0]%(indent, key, value))))
         else:
-            # one line only
-            body.append(get_ltext(colored_output.render(patt[1]%(indent,key))))
+            # other output (text, php)
+            if len(v):
+                # more lines: first is prefixed by column name
+                body.append(colored_output.render(patt[0]%(indent, key, escape(get_ltext(str_lists(v[0]))))))
+                # others are indented only
+                for text in v[1:]:
+                    body.append(patt[2]%(ljustify, escape(get_ltext(str_lists(text)))))
+            else:
+                # one line only
+                body.append(colored_output.render(patt[1]%(indent, key)))
     else:
         # value is not array
-        body.append(get_ltext(colored_output.render(patt[0]%(indent,key, escape(v)))))
+        body.append(colored_output.render(patt[0]%(indent, key, escape(get_ltext(v)))))
 
 def str_lists(text):
     """Prepare list or tuples for display. Same as str() but omit u'...' symbols

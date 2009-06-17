@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/domain-1.3"
-          xmlns:domain="http://www.nic.cz/xml/epp/domain-1.3"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/domain-1.4"
+          xmlns:domain="http://www.nic.cz/xml/epp/domain-1.4"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -51,6 +51,8 @@
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
         <element name="nsset" type="fredcom:objIDType"
+         minOccurs="0"/>
+        <element name="keyset" type="fredcom:objIDType"
          minOccurs="0"/>
         <element name="registrant" type="fredcom:objIDType"/>
         <element name="admin" type="fredcom:objIDType"
@@ -168,6 +170,8 @@
       <sequence>
         <element name="nsset" type="fredcom:objIDChgType"
          minOccurs="0"/>
+        <element name="keyset" type="fredcom:objIDChgType"
+         minOccurs="0"/>
         <element name="registrant" type="fredcom:objIDType"
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
@@ -259,6 +263,8 @@
         <element name="admin" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
         <element name="nsset" type="eppcom:labelType"
+         minOccurs="0"/>
+        <element name="keyset" type="eppcom:labelType"
          minOccurs="0"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"
