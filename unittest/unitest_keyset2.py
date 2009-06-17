@@ -64,6 +64,20 @@ newds = {'alg': '1', 'digest_type': '1', 'digest': 'ABCDE12345BBBBBB2345ABCDE123
 
 class Test(unittest.TestCase):
 
+    def __verify_results__(self, needle, label):
+        'Pomocna funkce'
+        haystack = ['']
+        not_found = 1
+        while haystack:
+            if needle in haystack:
+                not_found = 0
+                break
+            epp_cli.get_results()
+            self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
+            haystack = epp_cli.is_val(('data','list'))
+        self.failIf(not_found, '%s %s se v seznamu nenachazi.'%(label, needle))
+
+
 
     def setUp(self):
         'Check if client is online.'
@@ -357,6 +371,39 @@ class Test(unittest.TestCase):
         epp_cli.update_keyset(FRED_KEYSET5, None, {'tech':[FRED_CONTACT11, FRED_CONTACT15, FRED_CONTACT12]})
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
+
+    def test_200(self):
+	'10.50 prep_keysets: Seznam keysetu'
+	epp_cli.prep_keysets()
+	self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
+	self.failIf(int(epp_cli.is_val(('data','count'))) == 0, 'Seznam je prazdny prestoze by tam mela byt alespon jedna polozka.')
+
+    def test_201(self):
+	'10.51 prep_keysets_by_contact: Seznam keysetu podle kontaktu'
+	epp_cli.prep_keysets_by_contact(FRED_CONTACT13)
+	self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
+
+	print 'Number of keysets found: ', int(epp_cli.is_val(('data','count')))
+
+	self.failIf(int(epp_cli.is_val(('data','count'))) == 0, 'Seznam je prazdny prestoze by tam mela byt alespon jedna polozka.')
+
+    def test_202(self):
+	'10.51.1 get_results: (prep_keyset_by_contact): Overeni zda je v seznamu spravny keyset'
+	self.__verify_results__(FRED_KEYSET5, 'Keyset')
+	
+    def test_205(self):
+	'10.52 prep_keysets_by_contact: Seznam keysetu podle kontaktu'
+	epp_cli.prep_keysets_by_contact(FRED_CONTACT1)
+	self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
+
+	print 'Number of keysets found: ', int(epp_cli.is_val(('data','count')))
+
+	self.failIf(int(epp_cli.is_val(('data','count'))) == 0, 'Seznam je prazdny prestoze by tam mela byt alespon jedna polozka.')
+
+    def test_206(self):
+	'10.52.1 get_results: (prep_keyset_by_contact): Overeni zda je v seznamu spravny keyset'
+	self.__verify_results__(FRED_KEYSET4, 'Keyset')
+
     def test_897(self):
         '10.97 smazani keysetu'
         epp_cli.delete_keyset(FRED_KEYSET5)
@@ -418,6 +465,12 @@ class Test(unittest.TestCase):
         '14.5 smazani pomocneho kontaktu'
         epp_cli.delete_contact(FRED_CONTACT15)
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
+
+    def test_999(self):
+        '99. logout'
+        epp_cli.logout()
+        self.assertEqual(epp_cli.is_val(), 1500, unitest_share.get_reason(epp_cli))
+
 epp_cli, epp_cli_log, log_fp, log_step, poll_msg_id = (None,)*5
 
 if __name__ == '__main__':

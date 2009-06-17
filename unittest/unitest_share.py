@@ -162,7 +162,7 @@ def check_date(date, nu, sql_date=None):
     if sql_date:
         ts = list(time.strptime(sql_date[:10],'%Y-%m-%d'))
     else:
-        ts = list(time.gmtime())
+        ts = list(time.localtime())
     num = int(nu['num'])
     if nu['unit'] == 'y':
         ts[0] += num
@@ -314,16 +314,18 @@ def compare_domain_info(epp_cli, cols, data):
     ##    'domain:contact.type': u'admin'}
     ##____________________________________________________________
     username, password = epp_cli._epp.get_actual_username_and_password()
+
     err_not_equal(errors, data, 'domain:clID', username)
     err_not_equal(errors, data, 'domain:name', cols['name'])
     err_not_equal(errors, data, 'domain:nsset', cols['nsset'])
+    err_not_equal(errors, data, 'domain:keyset', cols['keyset'])
     err_not_equal(errors, data, 'domain:authInfo', cols['auth_info'])
     if not are_equal(data['domain:registrant'], cols['registrant']):
         errors.append('Data domain:registrant nesouhlasi. JSOU:%s MELY BYT:%s'%(make_str(data['domain:registrant']), make_str(cols['registrant'])))
     is_equal, exdate = check_date(data['domain:exDate'], cols['period'])
     if not is_equal:
         errors.append('Data domain:exDate nesouhlasi: jsou: %s a mely byt: %s'%(data['domain:exDate'], exdate))
-    actual_time = time.strftime('%Y-%m-%d',time.gmtime())
+    actual_time = time.strftime('%Y-%m-%d',time.localtime())
     if data['domain:crDate'][:10] != actual_time:
         errors.append('Data domain:crDate nesouhlasi: jsou: %s a mely by byt: %s'%(data['domain:crDate'],actual_time))
     return errors
@@ -444,7 +446,6 @@ def compare_keyset_info(epp_cli, cols, data):
     else:
         errors.append('Seznam DS nema pozadovany pocet. Ma %d a mel by mit %d.'%(len(ds),len(cols_ds)))
     return errors
-    
     
     
 get_local_text = fred.session_base.get_ltext

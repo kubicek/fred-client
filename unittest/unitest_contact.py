@@ -48,8 +48,7 @@ FRED_CONTACT = [
     'voice': '', #(nepovinný) telefon
     'fax': '', #(nepovinný) fax
     'disclose': {'flag':'n', 'data':('voice','fax','email', 'vat', 'ident', 'notify_email')},
-    'vat': '', #(nepovinný) DPH
-    'ident': '', #(nepovinný) Ident
+    'vat': '', #(nepovinný) DPH 'ident': '', #(nepovinný) Ident
     'ident': {'type':'','number':''}, #(nepovinný) Ident
     'notify_email': '', #(nepovinný) oznámení na email
     },
@@ -115,6 +114,22 @@ FRED_CONTACT.append({ # chg part to modify contact
     })
 
 class TestContact(unittest.TestCase):
+
+    
+    def __verify_results__(self, needle, label):
+        'Search for a result in output retrieved by get_results'
+        haystack = ['']
+        not_found = 1
+        while haystack:
+            if needle in haystack:
+                not_found = 0
+                break
+            epp_cli.get_results()
+            self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
+            haystack = epp_cli.is_val(('data','list'))
+        self.failIf(not_found, '%s %s se v seznamu nenachazi.'%(label, needle))
+
+
 
     def setUp(self):
         'Check if cilent is online.'
@@ -201,6 +216,16 @@ class TestContact(unittest.TestCase):
         errors = unitest_share.compare_contact_info('contact', FRED_CONTACT[1], epp_cli.is_val('data'))
         self.assert_(len(errors)==0, '\n'.join(errors))
 
+    def test_035(self):
+	'2.3.5 Seznam kontaktu prep_contacts'
+	epp_cli.prep_contacts()
+       	self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
+	self.failIf(int(epp_cli.is_val(('data','count'))) == 0, 'Seznam je prazdny prestoze by tam mela byt alespon jedna polozka.')
+
+    def test_036(self):
+	'.. Overeni ze je novy kontakt v seznamu'
+	self.__verify_results__(handle_contact, 'Contact')
+
     def test_040(self):
         '2.4 Pokus o zalozeni existujiciho kontaktu'
         # contact_id, name, email, city, cc
@@ -213,13 +238,23 @@ class TestContact(unittest.TestCase):
         epp_cli.check_contact(handles)
         self.assertEqual(epp_cli.is_val(('data',handle_contact)), 0)
         self.assertEqual(epp_cli.is_val(('data','CID:neexist002')), 1)
-
+        
     def test_060(self):
         '2.6 Info na existujici kontakt a overeni vsech hodnot'
         epp_cli.info_contact(handle_contact)
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
         errors = unitest_share.compare_contact_info('contact', FRED_CONTACT[1], epp_cli.is_val('data'))
         self.assert_(len(errors)==0, '\n'.join(errors))
+        
+    def test_064(self):
+        '2.6.0 Sendauthinfo na neexistujici kontakt.'
+        epp_cli.sendauthinfo_contact('CID:neexist002')
+        self.assertNotEqual(epp_cli.is_val(), 1000, 'Sendauthinfo na neexistujici kontakt proslo.')
+    
+    def test_065(self):
+        '2.6.1 Sendauthinfo na existujici kontakt.'
+        epp_cli.sendauthinfo_contact(handle_contact)
+        self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
     def test_070(self):
         '2.7 Update vsech parametru krome stavu'
@@ -383,6 +418,15 @@ class TestContact(unittest.TestCase):
         else:
             self.__testMethodDoc += ' skip test (no message ID)'
 
+    def test_998(self):
+        '98. logout'
+        epp_cli_TRANSF.logout()
+        self.assertEqual(epp_cli_TRANSF.is_val(), 1500, unitest_share.get_reason(epp_cli))
+
+    def test_999(self):
+        '99. logout'
+        epp_cli.logout()
+        self.assertEqual(epp_cli.is_val(), 1500, unitest_share.get_reason(epp_cli))
 
 
 epp_cli, epp_cli_TRANSF, epp_cli_log, log_fp, log_step, handle_contact = (None,)*6

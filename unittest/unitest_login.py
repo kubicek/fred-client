@@ -88,38 +88,59 @@ class TestLogin(unittest.TestCase):
             pass
         self.assertEqual(epp_cli.is_val(), 2501, unitest_share.get_reason(epp_cli))
         
-    def test_030(self):
-        '1.3 Zalogovani se spatnym otiskem certifikatu'
-        global dct_login
-        cert_name = None
-        current_section = epp_cli._epp.config_get_section_connect()
-        valid_certificat = epp_cli._epp.get_config_value(current_section,'ssl_cert')
-        for section in epp_cli._epp._conf.sections():
-            if section[:7]=='connect' and section != current_section:
-                # vybere se jiný certifikát než platný
-                certificat = epp_cli._epp.get_config_value(section,'ssl_cert')
-                if certificat != valid_certificat:
-                    cert_name = certificat
-                    break
-        self.assert_(cert_name, 'Nebyl nalezen vhodny certifikat. Nastavte v configu alespon jednu sekci connect_SESSION_NAME s jinym certifikatem, nez je ten platny.')
-        if not cert_name: return
-        # přiřazení neplatného certifikátu
-        epp_cli._epp._conf.set(current_section, 'ssl_cert', cert_name)
-        login = epp_cli._epp.get_logins_and_passwords()[0]
-        # dct_login - create global login values:
-        dct_login['username'] = login[0]
-        dct_login['password'] = login[1]
-        code, error = self.__login__(dct_login)
-        # navrácení platného certifikátu
-        epp_cli._epp._conf.set(current_section, 'ssl_cert', valid_certificat)
-        self.assert_(len(error), error)
-        self.assertNotEqual(code, 1000, 'Zalogovani proslo s neplatnym certifikatem:\n%s (section: %s)\nplatny je:\n%s.'%(cert_name,current_section,valid_certificat))
+#    def test_030(self):
+#        '1.3 Zalogovani se spatnym otiskem certifikatu'
+#        global dct_login
+#        cert_name = None
+#        current_section = epp_cli._epp.config_get_section_connect()
+#        valid_certificat = epp_cli._epp.get_config_value(current_section,'ssl_cert')
+#        for section in epp_cli._epp._conf.sections():
+#            if section[:7]=='connect' and section != current_section:
+#                # vybere se jiný certifikát než platný
+#                certificat = epp_cli._epp.get_config_value(section,'ssl_cert')
+#                if certificat != valid_certificat:
+#                    cert_name = certificat
+#                    break
+#        self.assert_(cert_name, 'Nebyl nalezen vhodny certifikat. Nastavte v configu alespon jednu sekci connect_SESSION_NAME s jinym certifikatem, nez je ten platny.')
+#        if not cert_name: return
+#        # přiřazení neplatného certifikátu
+#        epp_cli._epp._conf.set(current_section, 'ssl_cert', cert_name)
+#        login = epp_cli._epp.get_logins_and_passwords()[0]
+#        # dct_login - create global login values:
+#        dct_login['username'] = login[0]
+#        dct_login['password'] = login[1]
+#        code, error = self.__login__(dct_login)
+#        # navrácení platného certifikátu
+#        epp_cli._epp._conf.set(current_section, 'ssl_cert', valid_certificat)
+#        self.assert_(len(error), error)
+#        self.assertNotEqual(code, 1000, 'Zalogovani proslo s neplatnym certifikatem:\n%s (section: %s)\nplatny je:\n%s.'%(cert_name,current_section,valid_certificat))
 
     def test_040(self):
         '1.4 Zalogovani se spravnym heslem a spravnym otiskem certifikatu'
+
+        login = epp_cli._epp.get_logins_and_passwords()[0]
+	global dct_login
+        dct_login['username'] = login[0]
+        dct_login['password'] = login[1]
+
         code, error = self.__login__(dct_login)
         self.assert_(len(error)==0, error)
         self.assertEqual(code, 1000, unitest_share.get_reason(epp_cli))
+
+    def test_045(self):
+        '1.4.1 Odlogovani'
+        unitest_share.reset_client(epp_cli)
+	epp_cli.login(USERNAME, PASSWORD);
+
+        if epp_cli: self.assert_(epp_cli.is_logon(),'client is offline')
+        try:
+            epp_cli.logout()
+        except fred.FredError, msg:
+            pass
+            print '\n1.5.2 Odlogovani:',msg
+
+        self.assertEqual(epp_cli.is_val(), 1500, unitest_share.get_reason(epp_cli))
+
 
     def test_050(self):
         '1.5.1 Zmena hesla tam a zpatky s kontrolnim zalogovanim: Zmena hesla'
@@ -134,16 +155,7 @@ class TestLogin(unittest.TestCase):
         self.assert_(len(error)==0, error)
         self.assertEqual(code, 1000, unitest_share.get_reason(epp_cli))
 
-#    def test_060(self):
-#        '1.5.2 Odlogovani'
-#        unitest_share.reset_client(epp_cli)
-#        try:
-#            epp_cli.logout()
-#        except fred.FredError, msg:
-#            pass
-#            print '\n1.5.2 Odlogovani:',msg
-#        self.assertEqual(epp_cli.is_val(), 1500, unitest_share.get_reason(epp_cli))
-
+    
     def test_070(self):
         '1.5.3 Zalogovani s novym heslem'
         # zalogování pod novým heslem ........................
@@ -162,6 +174,7 @@ class TestLogin(unittest.TestCase):
 #            pass
 #            print '\n1.5.4 Odlogovani:',msg
 #        self.assertEqual(epp_cli.is_val(), 1500, unitest_share.get_reason(epp_cli))
+#
 
     def test_090(self):
         '1.5.5 Navraceni puvodniho hesla'
@@ -171,6 +184,15 @@ class TestLogin(unittest.TestCase):
         code, error = self.__login__(dct_login)
         self.assert_(len(error)==0, error)
         self.assertEqual(code, 1000, unitest_share.get_reason(epp_cli))
+
+    def test_100(self):
+	'1.6 Credit info'
+	# global epp_cli, epp_cli_log, handle_contact, handle_keyset, log_fp
+	epp_cli.login(USERNAME, PASSWORD);
+
+        if epp_cli: self.assert_(epp_cli.is_logon(),'client is offline')
+	epp_cli.credit_info()
+	self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
 
 epp_cli, log_fp, log_step = (None,)*3

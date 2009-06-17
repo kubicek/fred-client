@@ -208,19 +208,19 @@ class Test(unittest.TestCase):
     def test_040(self):
         '3.4.1 Pokus o zalozeni nssetu bez tech kontaktu'
         d = FRED_DATA[1]
-        epp_cli.create_nsset(d['id'], d['dns'], None)
+        epp_cli.create_nsset(d['id'], d['dns'], None, None, d['reportlevel'])
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
     def test_042(self):
         '3.4.2 Pokus o zalozeni nssetu s neznámým tech kontaktem'
         d = FRED_DATA[1]
-        epp_cli.create_nsset(d['id'], d['dns'], 'neznamycid', d['auth_info'])
+        epp_cli.create_nsset(d['id'], d['dns'], 'neznamycid', d['auth_info'], d['reportlevel'])
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
     def test_043(self):
         '3.4.3 Pokus o zalozeni nssetu jen s jednim dns'
         d = FRED_DATA[1]
-        epp_cli.create_nsset(FRED_NSSET1, d['dns'][0], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(FRED_NSSET1, d['dns'][0], d['tech'], d['auth_info'], d['reportlevel'])
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
     def test_044(self):
@@ -234,7 +234,7 @@ class Test(unittest.TestCase):
         handle = get_nssid_handle()
         dns = list(d['dns'])
         dns.append({'name': 'ns.name1.net', 'addr': ('217.31.207.130','217.31.207.129','217.31.207.128') })
-        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -245,7 +245,7 @@ class Test(unittest.TestCase):
         handle = get_nssid_handle()
         dns = list(d['dns'])
         dns.append({'name': 'ns.myname1.cz', 'addr': ('217.31.207.130','127.0.0.1') })
-        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -256,7 +256,7 @@ class Test(unittest.TestCase):
         handle = get_nssid_handle()
         dns = list(d['dns'])
         dns.append({'name': 'ns.myname1.cz', 'addr': ('217.31.207.130','217.31.130.256') })
-        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -266,7 +266,7 @@ class Test(unittest.TestCase):
         #d = FRED_DATA[1]
         #dns = list(d['dns'])
         #dns.append({'name': 'ns.myname1.cz', 'addr': ('217.31.207.130','0.0.0.0') })
-        #epp_cli.create_nsset(d['id'], dns, d['tech'], d['auth_info'])
+        #epp_cli.create_nsset(d['id'], dns, d['tech'], d['auth_info'], d['reportlevel'])
         #self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
     #def test_049(self):
@@ -274,7 +274,7 @@ class Test(unittest.TestCase):
         #d = FRED_DATA[1]
         #dns = list(d['dns'])
         #dns.append({'name': 'ns.myname1.cz', 'addr': ('217.31.207.130','1.1.1.1') })
-        #epp_cli.create_nsset(d['id'], dns, d['tech'], d['auth_info'])
+        #epp_cli.create_nsset(d['id'], dns, d['tech'], d['auth_info'], d['reportlevel'])
         #self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
     def test_051(self):
@@ -283,7 +283,7 @@ class Test(unittest.TestCase):
         handle = get_nssid_handle()
         dns = list(d['dns'])
         dns.append({'name': 'ns.myname1.cz', 'addr': ('217.31.207.130','10.0.0.0') })
-        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -294,7 +294,7 @@ class Test(unittest.TestCase):
         handle = get_nssid_handle()
         dns = list(d['dns'])
         dns.append({'name': 'ns.myname1.cz', 'addr': ('217.31.207.130','172.16.0.0') })
-        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -305,7 +305,7 @@ class Test(unittest.TestCase):
         handle = get_nssid_handle()
         dns = list(d['dns'])
         dns.append({'name': 'ns.myname1.cz', 'addr': ('217.31.207.130','192.168.0.0') })
-        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, dns, d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -315,7 +315,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = '...cz'
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -325,7 +325,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = '.pokus.cz'
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -335,7 +335,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = 'pokus..cz'
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -345,7 +345,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = 'pokus..test.cz'
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -361,7 +361,7 @@ class Test(unittest.TestCase):
             handle = get_nssid_handle()
             name = 'ns.te%sbt.cz' % notallowed[position]
             d['dns'][1]['name'] = name
-            epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+            epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
             # if nsset has been created append handle for delete it later
             if epp_cli.is_val() == 1000:
                 errors.append('Name %s has been accepted.' % name)
@@ -375,7 +375,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = '-pokus.cz'
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -385,7 +385,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = 'pokus-.cz'
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -395,7 +395,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = 'pok--us.cz'
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -405,7 +405,7 @@ class Test(unittest.TestCase):
         d = FRED_DATA[4]
         handle = get_nssid_handle()
         d['dns'][1]['name'] = '%s.cz' % ('a'*64, )
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -414,14 +414,14 @@ class Test(unittest.TestCase):
         '3.5.6 Zalozeni neexistujiciho noveho nssetu'
         d = FRED_DATA[1]
         d['dns'][1]['name'] = 'ns.name2.cz' # obnoveni puvodniho stavu
-        epp_cli.create_nsset(d['id'], d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(d['id'], d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
     def test_077(self):
         '3.5.7 Pokus o zalozeni existujiciho nssetu'
         d = FRED_DATA[4]
         handle = get_nssid_handle()
-        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(handle, d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         # if nsset has been created append handle for delete it later
         append_created_handle(epp_cli, handle)
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
@@ -439,27 +439,47 @@ class Test(unittest.TestCase):
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
         errors = unitest_share.compare_nsset_info(epp_cli, FRED_DATA[1], epp_cli.is_val('data'))
         self.assert_(len(errors)==0, '\n'.join(errors))
+        
+    def test_085(self):
+        '3.7.9.1 Sendauthinfo na existujici nsset.'
+        epp_cli.sendauthinfo_nsset(handle_nsset)
+        self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))        
+        
+    def test_086(self):
+        '3.7.9.2 Sendauthinfo na neexistujici nsset.'
+        epp_cli.sendauthinfo_contact('NSSID:notexist007')
+        self.assertNotEqual(epp_cli.is_val(), 1000, 'Sendauthinfo na neexistujici nsset proslo')        
 
-    def test_080(self):
+    def test_088(self):
+	'3.7.9.3 Technical test na nsset.'
+	epp_cli.technical_test(handle_nsset)
+        self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))        
+
+    def test_089(self):
+	'3.7.9.4 Technical test na neexistujici nsset.'
+	epp_cli.technical_test('NSSID:notexist008')
+        self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))        
+
+    def test_090(self):
         '3.8 Update vsech parametru krome stavu'
         d = FRED_DATA[2]
         epp_cli.update_nsset(d['id'], d['add'], d['rem'], d['auth_info'])
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
-    def test_081(self):
+    def test_091(self):
         '3.8.1 Overevni vsech hodnot zmeneneho nssetu'
         epp_cli.info_nsset(handle_nsset)
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
         errors = unitest_share.compare_nsset_info(epp_cli, FRED_DATA[3], epp_cli.is_val('data'))
         self.assert_(len(errors)==0, '\n'.join(errors))
 
-    def test_082(self):
+    def test_092(self):
         '3.8.2 Pokus o odebrani neexistujici dns'
         d = FRED_DATA[2]
         epp_cli.update_nsset(d['id'], None, {'name':'ns.namex.cz'})
         self.assertNotEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
-    def test_084(self):
+    def test_093(self):
         '3.8.3 Pokus o odebnani dns tak, aby v nssetu zustal jen jeden'
         d = FRED_DATA[2]
         epp_cli.update_nsset(d['id'], None, {'name':'ns.name3.cz'})
@@ -863,7 +883,7 @@ class Test(unittest.TestCase):
     def test_320(self):
         '3.5 Pokus o vytvoreni nssetu, ktery byl prave smazan a musi byt v ochranne zone'
         d = FRED_DATA[1]
-        epp_cli.create_nsset(d['id'], d['dns'], d['tech'], d['auth_info'])
+        epp_cli.create_nsset(d['id'], d['dns'], d['tech'], d['auth_info'], d['reportlevel'])
         self.assertEqual(epp_cli.is_val(), 2005, unitest_share.get_reason(epp_cli))
         
 
@@ -874,6 +894,15 @@ class Test(unittest.TestCase):
         epp_cli.delete_contact(FRED_CONTACT2)
         self.assertEqual(epp_cli.is_val(), 1000, unitest_share.get_reason(epp_cli))
 
+    def test_998(self):
+        '98. logout'
+        epp_cli_TRANSF.logout()
+        self.assertEqual(epp_cli_TRANSF.is_val(), 1500, unitest_share.get_reason(epp_cli))
+
+    def test_999(self):
+        '99. logout'
+        epp_cli.logout()
+        self.assertEqual(epp_cli.is_val(), 1500, unitest_share.get_reason(epp_cli))
 
 
 epp_cli, epp_cli_TRANSF, epp_to_log, log_fp, log_step, handle_contact, handle_nsset, poll_msg_id = (None,)*8
