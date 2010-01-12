@@ -27,22 +27,39 @@ object for manage with EPP commands and answers.
 
 UNBOUNDED = eppdoc_assemble.UNBOUNDED
 
-IDENT_NAMES = (
-    ('op',       _T('Number identity card')),
-    ('passport', _T('Number of passport')),
-    ('mpsv',     _T('Number of Ministry of Labour and social affairs')),
-    ('ico',      _T('Number of company')), 
-    ('birthday', _T('Birthday date')), 
+
+def get_ident_names(keys=None, descr=None):
+    "Get names"
+    ident_names = (
+        ('op',       _T('Number identity card')),
+        ('passport', _T('Number of passport')),
+        ('mpsv',     _T('Number of Ministry of Labour and social affairs')),
+        ('ico',      _T('Number of company')), 
+        ('birthday', _T('Birthday date')), 
     )
-IDENT_TYPES = map(lambda n: n[0], IDENT_NAMES) # ('op','passport','mpsv','ico', 'birthday')
+    if keys:
+        # return keys only
+        return [key for key, description in ident_names]
+    if descr:
+        # return description only 
+        return [description for key, description in ident_names]
+    return ident_names
 
 
+def ident_type_list():
+    "Ident types"
+    return [(name, ) for name in get_ident_names(True)]
+
+
+    
 # Help
 def get_shared_notice():
     'Returns notice for EPP commands'
     return {   
    'disclose':_T('Names what are not included into disclose list are set to opposite value of the disclose flag value.'),
-    'ident': '%s\n%s'%(_T('Identificator type can be:'), '\n'.join(map(lambda n: '   %s%s'%(n[0].ljust(10), n[1]), IDENT_NAMES))), 
+    'ident': '%s\n%s'%(_T('Identificator type can be:'), 
+    '\n'.join(['%#-10s %s' % (name, desc) for name, desc in get_ident_names()])
+    ), 
 }
 
 def make_command_parameters():
@@ -206,7 +223,7 @@ will be generated automaticly after succefull transfer."""),('transfer_domain do
             ('vat',(0,1),(),_T('VAT (Value-added tax)'),'7035555556','',()), # vat identificator
             ('ident',(0,1),(),_T('Identificator'),'','',( # mpsv: identifikator Ministerstva prace a socialnich veci
                 ('number',(1,1),(),_T('Identificator number'),'8888888856','',()),
-                ('type',(1,1),map(lambda n:(n,), IDENT_TYPES),_T('Identificator type'),'op','',()),
+                ('type',(1,1), ident_type_list(), _T('Identificator type'),'op','',()),
             )),
             ('notify_email',(0,1),(),_T('Notification email'),'info@mymail.cz','',()),
             ],'%s\n\n%s\n\n%s'%(_T("""
@@ -228,6 +245,7 @@ Contact can be used for values of the owner, registrant or technical contact."""
             )),
             ('admin',(0,UNBOUNDED),(),_T('Administrative contact ID'),'CID:ADMIN_ID','',()),
             ('val_ex_date',(0,1),(),_T('Validation expires at date. This value is required for ENUM domains.'),'2008-12-03','',()),
+            ('publish', (0,1), (('y',), ('n',)), _T('Include ENUM domain into ENUM dictionary'), 'true', '', ()),
             ],_T("""
 The EPP 'create_domain' command is used to create domain.
 A domain can be created for an indefinite period of time, or 
@@ -236,7 +254,7 @@ you can create two types of the domain: cz and ENUM.
 The difference is in parameter val_ex_date. It is required 
 for ENUM domains."""),(
                 'create_domain domain.cz cid:regid password nssid:nsid NULL (3 y) (cid:admin1,cid:admin2)',
-                'create_domain 1.1.1.7.4.5.2.2.2.0.2.4.e164.arpa cid:regid password nssid:nsid keysid:id (3 y) (cid:admin1,cid:admin2) 2006-06-08'
+                'create_domain 1.1.1.7.4.5.2.2.2.0.2.4.e164.arpa cid:regid password nssid:nsid keysid:id (3 y) (cid:admin1,cid:admin2) 2006-06-08 y'
             )),
         #----------------------------------------------------
         'create_nsset': (3,[
@@ -262,13 +280,6 @@ lower level number. Valid range is from 0 to 10.
         #----------------------------------------------------
         'create_keyset': (3,[
             ('id',(1,1),(),_T('KEYSET ID'),'KEYSID:ID','',()),
-            ('ds',(0,9),(),_T('LIST of DS records'),'','',(
-                ('key_tag',(1,1),(),_T('Key tag'),'1','',()),
-                ('alg',(1,1),(),_T('Algorithm'),'1','',()),
-                ('digest_type',(1,1),(),_T('Digest Type'),'1','',()),
-                ('digest',(1,1),(),_T('Digest'),'1539349af5da340c2d3dd6ea6b2676bedb596a41','',()),
-                ('max_sig_life',(0,1),(),_T('Max.Sig.Life'),'1','',()),
-            )),
             ('dsref',(0,9),(),_T('LIST of filenames with DS records'),'unittest/ds.cz','',()),
             ('dnskey',(0,9),(),_T('LIST of keys'),'','',(
                 ('flags',(1,1),(),_T('Flags'),'257','',()),
@@ -282,8 +293,8 @@ lower level number. Valid range is from 0 to 10.
             ],_T("""
 The EPP 'create_keyset' command is used to create a record of the KEYSET.
 """),(
-                'create_keyset KEYSID:01 ((1 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a41), (2 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a42 1)) (unittest/ds.cz) ((257 3 5 "AwEAAddt2AkLfYGKgiEZB5SmIF8EvrjxNMH6HtxWEA4RJ9Ao6LCWheg8=")) () CID:ID01 passw', 
-                'create_keyset KEYSID:01 ((1 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a41), (2 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a42 1)) () () (unittest/dnskey.pub) CID:ID01 passw', 
+                'create_keyset KEYSID:01 (unittest/ds.cz) ((257 3 5 AwEAAddt2AkLfYGKgiEZB5SmIF8EvrjxNMH6HtxWEA4RJ9Ao6LCWheg8)) () CID:ID01 passw', 
+                'create_keyset KEYSID:01 () () (unittest/dnskey.pub) CID:ID01 passw', 
             )),
         #----------------------------------------------------
         'delete_contact': (1,[
@@ -346,7 +357,7 @@ and maximum allowable period is defined in the Communication rules."""),('renew_
                 ('vat',(0,1),(),_T('VAT'),'7035555556','',()),
                 ('ident',(0,1),(),_T('Identificator'),'','',(
                     ('number',(1,1),(),_T('Identificator number'),'8888888856','',()),
-                    ('type',(0,1),map(lambda n:(n,), IDENT_TYPES),_T('Identificator type'),'op','',()),
+                    ('type',(0,1), ident_type_list(), _T('Identificator type'),'op','',()),
                 )),
                 ('notify_email',(0,1),(),_T('Notification email'),'notify@mymail.cz','',()),
             )),
@@ -368,9 +379,10 @@ and maximum allowable period is defined in the Communication rules."""),('renew_
                 ('auth_info',(0,1),(),_T('Password required by server to authorize the transfer'),'mypassword','',()),
             )),
             ('val_ex_date',(0,1),(),_T('Validation expires at'),'2008-12-03','',()),
+            ('publish', (0,1), (('y',), ('n',)), _T('Include ENUM domain into ENUM dictionary'), 'true', '', ()),
             ],_T("""The EPP 'update_domain' command is used to update values in the domain."""),(
                 'update_domain mydomain.cz (CID:ID01, CID:ID02) CID:ID03 CID:TMP01 (NSSID:NSSET01 NULL CID:ID04 mypass)',
-                'update_domain 1.1.1.7.4.5.2.2.2.0.2.4.e164.arpa (CID:ID01, CID:ID02) CID:ID03 CID:TMP01 (NSSID:NSSET01 KEYSID:KEYSET01 CID:ID04 mypass) 2008-12-03',
+                'update_domain 1.1.1.7.4.5.2.2.2.0.2.4.e164.arpa (CID:ID01, CID:ID02) CID:ID03 CID:TMP01 (NSSID:NSSET01 KEYSID:KEYSET01 CID:ID04 mypass) 2008-12-03 y',
             )),
         #----------------------------------------------------
         'update_nsset': (1,[
@@ -395,13 +407,6 @@ and maximum allowable period is defined in the Communication rules."""),('renew_
         'update_keyset': (1,[
             ('id',(1,1),(),_T('KEYSET ID'),'KEYSET_ID','',()),
             ('add',(0,1),(),_T('Add values'),'','',(
-                ('ds',(0,9),(),_T('LIST of DS records'),'','',(
-                    ('key_tag',(1,1),(),_T('Key tag'),'1','',()),
-                    ('alg',(1,1),(),_T('Algorithm'),'1','',()),
-                    ('digest_type',(1,1),(),_T('Digest Type'),'1','',()),
-                    ('digest',(1,1),(),_T('Digest'),'1539349af5da340c2d3dd6ea6b2676bedb596a41','',()),
-                    ('max_sig_life',(0,1),(),_T('Max.Sig.Life'),'1','',()),
-                )),
                 ('dsref',(0,9),(),_T('LIST of filenames with DS records'),'unittest/ds.cz','',()),
                 ('dnskey',(0,9),(),_T('LIST of keys'),'','',(
                     ('flags',(1,1),(),_T('Flags'),'257','',()),
@@ -413,13 +418,6 @@ and maximum allowable period is defined in the Communication rules."""),('renew_
                 ('tech',(0,UNBOUNDED),(),_T('Technical contact ID'),'CID:ID01','',()),
             )),
             ('rem',(0,1),(),_T('Remove values'),'','',(
-                ('ds',(0,9),(),_T('LIST of DS records'),'','',(
-                    ('key_tag',(1,1),(),_T('Key tag'),'1','',()),
-                    ('alg',(1,1),(),_T('Algorithm'),'1','',()),
-                    ('digest_type',(1,1),(),_T('Digest Type'),'1','',()),
-                    ('digest',(1,1),(),_T('Digest'),'499602d2','',()),
-                    ('max_sig_life',(0,1),(),_T('Max.Sig.Life'),'1','',()),
-                )),
                 ('dsref',(0,9),(),_T('LIST of filenames with DS records'),'unittest/ds.cz','',()),
                 ('dnskey',(0,9),(),_T('LIST of keys'),'','',(
                     ('flags',(1,1),(),_T('Flags'),'257','',()),
@@ -432,8 +430,9 @@ and maximum allowable period is defined in the Communication rules."""),('renew_
             )),
             ('auth_info',(0,1),(),_T('Password required by server to authorize the transfer'),'new_password','',()),
             ],_T("""The EPP 'update_keyset' command is used to update values in the KEYSET."""),(
-            'update_keyset KEYSID:01 (((1 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a41), (2 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a42 1)) (unittest/ds.cz) ((256 3 5 "AwEAAddt2AkLfYGKgiEZB5SmIF8EvrjxNMH6HtxWEA4RJ9Ao6LCWheg8="))) (((1 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a41), (2 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a42 1)) () () () (cid:tech1, cid:tech2, cid:tech3)) password', 
-            "update_keyset KEYSID:01 (((1 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a41), (1 2 1 1539349af5da340c2d3dd6ea6b2676bedb596a42 1)) () () unittest/dnskey.pub) (((1 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a41), (2 1 1 1539349af5da340c2d3dd6ea6b2676bedb596a42 1)) unittest/ds.cz () unittest/dnskey.pub (cid:tech1, cid:tech2, cid:tech3)) password", 
+            'update_keyset KEY01 (unittest/ds.cz ((256 3 5 AwEAAddt2AkLfYGKgiEZB5SmIF8EvrjxNMH6HtxWEA4RJ9Ao6LCWheg8))) (() () () (CID:TECH1, CID:TECH2, CID:TECH3)) password', 
+            'update_keyset KEY02 (unittest/ds.cz () unittest/dnskey.pub) (unittest/ds.cz () unittest/dnskey.pub)', 
+            'update_keyset KEY03 (unittest/ds.cz) (unittest/ds.cz () unittest/dnskey.pub)', 
             )),
         #----------------------------------------------------
         'sendauthinfo_contact': (1,[
@@ -658,7 +657,8 @@ def make_sort_by_names():
          ('trDate',      1,  _T('Last transfer on')),
          ('upDate',      1,  _T('Last update on')),
          ('exDate',      1,  _T('Expiration date')),
-         ('valExDate',   1,  _T('Validation expires at')), # vadit to date
+         ('valExDate',   1,  _T('Validation expires at')), # valid to date
+         ('publish',     1,  _T('Include into ENUM dict')),
          ('nsset',       1,  _T('NSSET ID')),
          ('keyset',      1,  _T('KEYSET ID')),
          ('authInfo',    1,  _T('Password for transfer')),

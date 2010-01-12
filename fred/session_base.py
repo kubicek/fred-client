@@ -24,6 +24,7 @@ import terminal_controler
 import translate
 import session_config
 import internal_variables
+from subprocess import Popen, PIPE
 """
 Class ManagerBase is a part of one Manager object  what provide client session.
 This base class owns basic variables and functions needed for manage EPP XML 
@@ -528,13 +529,17 @@ $fred_client_errors = array(); // errors occuring during communication
         # Load configuration file:
         self._conf, self._config_used_files, config_errors, self._message_missing_config =\
                 session_config.main(self._config_name, self._options, self._session[VERBOSE], OMIT_ERROR)
+        
+        language = self._session[LANG]
         # language from environment and configuration file:
-        if len(self._options.get('lang','')): self._session[LANG] = self._options['lang']
+        if len(self._options.get('lang','')):
+            language = self._options['lang']
         # overwrite config by option from command line:
         if self._options.has_key('lang_option'):
-            self._session[LANG] = self._options['lang_option']
-        # SET LANGUAGE VERSION:
-        translate.install_translation(self._session[LANG])
+            language = self._options['lang_option']
+        
+        self.set_language(language) # set translation
+        
         if len(self._config_used_files):
             self.append_note('%s %s'%(_T('Using configuration from'), ', '.join(self._config_used_files)))
         if len(config_errors):
@@ -646,7 +651,10 @@ $fred_client_errors = array(); // errors occuring during communication
         'Check if exists external validator (xmllint).'
         ok = 0
         try:
-            pipes = os.popen3(self._external_validator)
+            procs = Popen(self._external_validator, shell=True, stdin=PIPE, 
+                          stdout=PIPE, stderr=PIPE)
+            # pipes: (p.stdin, p.stdout, p.stderr)
+            pipes = (procs.stdin, procs.stdout, procs.stderr)
         except IOError, msg:
             self.append_note('check_validator: %s'%str(msg),('RED','BOLD'))
         standr = pipes[1].read()
@@ -691,7 +699,9 @@ $fred_client_errors = array(); // errors occuring during communication
             self.append_note(_T('Client-side validation command:'), 'BOLD')
             self.append_note(get_ltext(command))
         try:
-            pipes = os.popen3(command,'w+')
+            procs = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            # pipes: (p.stdin, p.stdout, p.stderr)
+            pipes = (procs.stdin, procs.stdout, procs.stderr)
             pipes[0].write(message)
             pipes[0].close()
         except IOError, msg:
