@@ -1,5 +1,7 @@
-import string, os
+import string, os, re
+from types import StringType
 from distutils.command.build_py import build_py as _build_py
+
 
 class build_py(_build_py):
     def finalize_options(self):
@@ -55,6 +57,50 @@ class build_py(_build_py):
                     #FREDDIST line changed
                     return self.srcdir
     #get_package_dir()
+
+
+    def modify_file(self, command, filename, targetpath):
+        "Modify file if any function is defined."
+        if not hasattr(self.distribution, "modify_files"):
+            return
+        
+        # modify_files: {"command": 
+        #                 (("module.function", ("filename", ...)), ...), ...}
+        for mfncname, files in self.distribution.modify_files.get(command, []):
+            modulename, fncname = mfncname.split(".")
+            moduleobj = self.distribution.command_obj.get(modulename)
+            if not moduleobj:
+                continue
+            fnc = getattr(moduleobj, fncname)
+            for name in files:
+                if re.search("%s$" % name, filename):
+                    # modify file by fnc(SRC, DEST) from SRC to DEST
+                    fnc(filename, os.path.join(targetpath, name))
+
+
+    def build_module (self, module, module_file, package):
+        "Extend build_module by modification files"
+        # do original function
+        retval = _build_py.build_module(self, module, module_file, package)
+        if type(package) is StringType:
+            package = string.split(package, '.')
+        outfile = self.get_module_outfile(self.build_lib, package, module)
+        # extend by modify file if is defined
+        self.modify_file("build_py", module_file, os.path.dirname(outfile))
+        return retval
+
+
+    def build_package_data (self):
+        """Copy data files into build directory"""
+        lastdir = None
+        for package, src_dir, build_dir, filenames in self.data_files:
+            for filename in filenames:
+                source = os.path.join(src_dir, filename)
+                target = os.path.join(build_dir, filename)
+                self.mkpath(os.path.dirname(target))
+                self.copy_file(source, target, preserve_mode=False)
+                self.modify_file("build_py", source, os.path.dirname(target))
+
 
     def run(self):
         _build_py.run(self)

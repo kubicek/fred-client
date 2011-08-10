@@ -45,6 +45,11 @@ except:
     from command.install_lib import install_lib
 
 try:
+    from freddist.command.install_egg_info import install_egg_info
+except:
+    from command.install_egg_info import install_egg_info
+
+try:
     from freddist.command.sdist import sdist 
 except ImportError:
     from command.sdist import sdist
@@ -58,6 +63,9 @@ try:
     from freddist.command.bdist_rpm import bdist_rpm
 except ImportError:
     from command.bdist_rpm import bdist_rpm
+
+from freddist.command.bdist_deb import bdist_deb
+
 try:
     from freddist.command.bdist_wininst import bdist_wininst
 except ImportError:
@@ -88,6 +96,9 @@ class Distribution(_Distribution):
         self.rundir = None
         self.requires = None
         
+        # a structure for modification of files:
+        # {"command": (("module.function", ("filename", ...)), ...), ...}
+        self.modify_files = {}
 
         self.cmdclass = {}
         _Distribution.__init__(self, attrs)
@@ -108,12 +119,16 @@ class Distribution(_Distribution):
             self.cmdclass['install_scripts'] = install_scripts
         if not self.cmdclass.get('install_lib'):
             self.cmdclass['install_lib'] = install_lib
+        if not self.cmdclass.get('install_egg_info'):
+            self.cmdclass['install_egg_info'] = install_egg_info
         if not self.cmdclass.get('sdist'):
             self.cmdclass['sdist'] = sdist
         if not self.cmdclass.get('bdist'):
             self.cmdclass['bdist'] = bdist
         if not self.cmdclass.get('bdist_rpm'):
             self.cmdclass['bdist_rpm'] = bdist_rpm
+        if not self.cmdclass.get('bdist_deb'):
+            self.cmdclass['bdist_deb'] = bdist_deb
         if not self.cmdclass.get('bdist_wininst'):
             self.cmdclass['bdist_wininst'] = bdist_wininst
         # if not self.cmdclass.get('bdist_dumb'):
@@ -124,6 +139,10 @@ class Distribution(_Distribution):
             self.cmdclass['clean'] = clean
         if not self.cmdclass.get('uninstall'):
             self.cmdclass['uninstall'] = uninstall
+        
+        self.global_options.append(("fred-distutils-dir=", None,
+                                    "Path to freddist module."))
+
 
     def has_srcdir (self):
         return self.srcdir or '.'
@@ -167,10 +186,24 @@ class Distribution(_Distribution):
                 files.append(user_file)
 
         # All platforms support local setup.cfg
-        #FREDDIST added self.srcdir
-        local_file = os.path.join(os.curdir, "setup.cfg")#os.path.join(self.srcdir, "setup.cfg")
-        if os.path.isfile(local_file):
-            files.append(local_file)
-
+        cfg_name = "setup.cfg"
+        if os.path.isfile(cfg_name):
+            # config is in current dir
+            files.append(cfg_name)
+        elif os.path.isfile(os.path.join(self.srcdir, cfg_name)):
+            # confir is inj source dir (where is the setup.py)
+            files.append(os.path.join(self.srcdir, cfg_name))
+        
         return files
     # find_config_files ()
+
+
+    def _show_help (self, parser, global_options=1, display_options=1, commands=[]):
+        "Join individual messages after default help"
+        _Distribution._show_help(self, parser, global_options, display_options, commands)
+        # display additions
+        for command_class in self.cmdclass.values():
+            if hasattr(command_class, 'show_after_help'):
+                command_class.show_after_help(commands) # must be staticmethod
+
+

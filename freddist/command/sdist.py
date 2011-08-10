@@ -1,4 +1,4 @@
-import os, types, sys
+import os, types, sys, string
 from glob import glob
 from distutils import dep_util, log, dir_util
 from distutils.text_file import TextFile
@@ -9,6 +9,17 @@ sys.path.append('..')
 from freddist.filelist import FileList
 
 class sdist(_sdist):
+
+    user_options = _sdist.user_options
+    user_options.append(('create-manifest-in', None, 'Create file MANIFEST.in'))
+    
+    boolean_options = ['create-manifest-in']
+
+    def initialize_options(self):
+        self.fred_distutils_dir = None
+        _sdist.initialize_options(self)
+        self.create_manifest_in = False
+    
     def finalize_options(self):
         self.srcdir = self.distribution.srcdir
         _sdist.finalize_options(self)
@@ -139,7 +150,7 @@ class sdist(_sdist):
             files = filter(os.path.isfile, glob(pattern))
             if files:
                 self.filelist.extend(files)
-
+        
         if self.distribution.has_pure_modules():
             build_py = self.get_finalized_command('build_py')
             self.filelist.extend(build_py.get_source_files())
@@ -264,6 +275,32 @@ class sdist(_sdist):
         self.distribution.metadata.write_pkg_info(base_dir)
     # make_release_tree ()
 
+
+    def generate_manifest_in(self, initial=None):
+        "This function generage file MANIFEST.in from distribution.data_files array."
+        
+        manifest = ['# created by:$ python setup.py sdist --create-manifest-in']
+        
+        # include individual variables
+        if isinstance(initial, list) or isinstance(initial, tuple):
+            manifest.extend(initial)
+        elif isinstance(initial, str):
+            manifest.append(initial)
+        
+        # include folders from distribution.data_files
+        for line in self.distribution.data_files:
+            if len(line[1]):
+                path = os.path.dirname(line[1][0])
+                if path:
+                    manifest.append('include %s/*' % path)
+                else:
+                    manifest.append('include %s' % ' '.join(line[1]))
+        
+        open('MANIFEST.in', 'w').write('\n'.join(manifest))
+        log.info('MANIFEST.in was created.')
+    
+    
+    
     def run(self):
         # 'filelist' contains the list of files that will make up the
         # manifest
@@ -278,12 +315,49 @@ class sdist(_sdist):
         # whatever).  File list is accumulated in 'self.filelist'.
         self.get_file_list()
 
+        # Just create document MANIFEST IN
+        if self.create_manifest_in:
+            self.generate_manifest_in()
+            return
+        
         # If user just wanted us to regenerate the manifest, stop now.
         if self.manifest_only:
             return
-
+        
         # Otherwise, go ahead and create the source distribution tarball,
         # or zipfile, or whatever.
         self.make_distribution()
         # _sdist.run(self)
-#class Sdist
+
+
+    def make_distribution (self):
+        """Create the source distribution(s).  First, we create the release
+        tree with 'make_release_tree()'; then, we create all required
+        archive files (according to 'self.formats') from the release tree.
+        Finally, we clean up by blowing away the release tree (unless
+        'self.keep_temp' is true).  The list of archive files created is
+        stored so it can be retrieved later by 'get_archive_files()'.
+        """
+        # Don't warn about missing meta-data here -- should be (and is!)
+        # done elsewhere.
+        base_dir = self.distribution.get_fullname()
+        base_name = os.path.join(self.dist_dir, base_dir)
+
+        self.make_release_tree(base_dir, self.filelist.files)
+        
+        archive_files = []              # remember names of files we create
+        for fmt in self.formats:
+            file = self.make_archive(base_name, fmt, base_dir=base_dir)
+            archive_files.append(file)
+            self.distribution.dist_files.append(('sdist', '', file))
+
+        self.archive_files = archive_files
+        
+        # pack freddist module
+        import freddist
+        dir_util.copy_tree(os.path.dirname(freddist.__file__), 
+                           os.path.join(base_dir, "freddist"))
+        
+        if not self.keep_temp:
+            dir_util.remove_tree(base_dir, dry_run=self.dry_run)
+

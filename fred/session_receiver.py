@@ -423,6 +423,27 @@ class ManagerReceiver(ManagerCommand):
         "data=(response,result,code,msg)"
         self.__answer_response_check__(data, ('keyset','id'))
 
+
+    def get_nodes_with_xmlns(self, dmsg):
+        "Returns the list of nodes with their xmlns"
+        retval = []
+        if dmsg is None:
+            return retval
+        for key, data in dmsg.items():
+            xmlns = ''
+            for attr_key, att_value in data.get('attr', []):
+                # split prefix and local name
+                attr_pref, attr_name = eppdoc.split_qattr_key(attr_key)
+                key_pref, key_name = eppdoc.split_prexis_name(key)
+                # if attribute is xmlns and prefix is equal with node prefix
+                if attr_pref == 'xmlns' and attr_name == key_pref:
+                    # then join ns definition to node name
+                    xmlns = " xmlns=%s" % att_value
+                    break
+            retval.append("%s%s" % (eppdoc.remove_ns(key), xmlns))
+        return retval
+
+
     def answer_response_poll(self, data):
         "data=(response,result,code,msg)"
         label='poll'
@@ -436,11 +457,11 @@ class ManagerReceiver(ManagerCommand):
             if not self._dct_answer['data'].has_key('msg'):
                 # if message is not simple text but XML document:
                 dmsg = msgQ.get('msg')
+                self._dct_answer['data']['msg.nodes'] = self.get_nodes_with_xmlns(dmsg)
                 if dmsg is not None and len(dmsg) == 1:
                     # remove topmost element if it is only one
                     key, dmsg = dmsg.popitem()
-                self._dct_answer['data']['msg'] = '\n'+eppdoc.prepare_display(dmsg, COLOR)
-            
+                self._dct_answer['data']['msg'] = '\n'+eppdoc.prepare_display(dmsg, self._session[COLORS])
         # convert str to int:
         for key in ('id','count'):
             sval = self.get_value_from_dict(('data','msgQ.%s'%key))
@@ -467,6 +488,7 @@ class ManagerReceiver(ManagerCommand):
                     data['msg'] = '\n'.join((data['msg'], self._dct_answer['data']['msg']))
                 if len(self._dct_answer['errors']): dct['errors'].extend(self._dct_answer['errors'])
                 self._dct_answer = dct
+
 
     def __response_create__(self, data, columns, keys):
         """data=(response,result,code,msg) 

@@ -1,11 +1,12 @@
-import os
+import sys, os, string
+
 from distutils.debug import DEBUG
 from distutils.command.bdist_rpm import bdist_rpm as _bdist_rpm
-
-import sys, os, string
-from types import *
+from distutils.errors import DistutilsPlatformError, DistutilsOptionError
 from distutils.file_util import write_file
 from distutils import log
+
+from types import *
 
 # bdist_rpm notes:
 #
@@ -87,6 +88,8 @@ class bdist_rpm(_bdist_rpm):
         self.no_setupcfg        = None
         self.setupcfg_template  = None
         self.setupcfg_output    = None
+        self.fred_distutils_dir = None
+        
         _bdist_rpm.initialize_options(self)
 
     #FREDDIST new method

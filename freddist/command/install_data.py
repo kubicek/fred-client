@@ -1,4 +1,4 @@
-import types, os, re, sys
+import types, os, re, sys, filecmp
 from distutils import util
 from distutils.command.install_data import install_data as _install_data
 from install_parent import install_parent
@@ -33,90 +33,44 @@ from install_parent import install_parent
 # All these setting can be overriden by proper options.
 # On line 16 is example of creating empty directory.
 
+is_eventd = re.compile("event.d/?$")
+
+
 class install_data(_install_data, install_parent):
-    user_options = _install_data.user_options
-    boolean_options = _install_data.boolean_options
+
+    user_options = _install_data.user_options + install_parent.user_options
+    boolean_options = _install_data.boolean_options + install_parent.boolean_options
 
     user_options.append(('root=', None,
         'install everything relative to this alternate root directory'))
     user_options.append(('prefix=', None,
         'installation prefix'))
-    user_options.append(('bindir=', None,
-        'user executables [PREFIX/bin]'))
-    user_options.append(('sbindir=', None,
-        'system admin executables [PREFIX/sbin]'))
-    user_options.append(('sysconfdir=', None, 
-        'System configuration directory [PREFIX/etc]'))
-    user_options.append(('libexecdir=', None,
-        'Program executables [PREFIX/libexec]'))
-    user_options.append(('localstatedir=', None,
-        'Modifiable single machine data [PREFIX/var]'))
-    user_options.append(('libdir=', None,
-        'object code libraries [PREFIX/lib]'))
-    user_options.append(('pythondir=', None,
-        'python directory [LIBDIR/python%d.%d]' %
-        (sys.version_info[0], sys.version_info[1])))
-    user_options.append(('purelibdir=', None,
-        'python pure libraries [LIBDIR/python%d.%d/site-packages]' %
-        (sys.version_info[0], sys.version_info[1])))
-    user_options.append(('datarootdir=', None,
-        'read only architecture-independent data root [PREFIX/share]'))
-    user_options.append(('datadir=', None,
-        'read only architecture-independent data [DATAROOTDIR]'))
-    user_options.append(('infodir=', None,
-        'info documentation [DATAROOTDIR/info]'))
-    user_options.append(('mandir=', None,
-        'man documentation [DATAROOTDIR/man]'))
-    user_options.append(('docdir=', None,
-        'documentation root [DATAROOTDIR/doc/NAME]'))
-    user_options.append(('localedir=', None,
-        'locale-dependent data [DATAROOTDIR/locale]'))
+    user_options.append(('include-eventd', None,
+        'Include event.d folder in doc folder.'))
+    
+    boolean_options.append('include_eventd')
 
-    user_options.append(('preservepath', None, 
-        'Preserve path(s) in configuration file(s).'))
-    user_options.append(('no-record', None,
-        'do not record list of installed files'))
-    user_options.append(('no-pycpyo', None,
-        'do not create compiled pyc and optimized pyo files'))
-    user_options.append(('no-check-deps', None,
-        'do not check dependencies'))
-
-    user_options.append(('fgen-setupcfg', None,
-        'force generate setup.cfg from template'))
-    user_options.append(('no-update-setupcfg', None,
-        'do not update setup.cfg file'))
-    user_options.append(('no-gen-setupcfg', None,
-        'do not generate setup.cfg file'))
-    user_options.append(('no-setupcfg', None,
-        'do not use setup.cfg file'))
-    user_options.append(('setupcfg-template=', None,
-        'template file for setup.cfg [setup.cfg.template]'))
-    user_options.append(('setupcfg-output=', None,
-        'output file with setup configuration [setup.cfg]'))
-    user_options.append(('replace-path-rel', None,
-        'When setup.py replace some path, replace it with relative path'))
-
-    boolean_options.append('preservepath')
-    boolean_options.append('no_record')
-    boolean_options.append('no_pycpyo')
-    boolean_options.append('no_check_deps')
-    boolean_options.append('fgen_setupcfg')
-    boolean_options.append('no_update_setupcfg')
-    boolean_options.append('no_gen_setupcfg')
-    boolean_options.append('no_setupcfg')
-    boolean_options.append('replace_path_rel')
+    NOT_ADD_ROOT = 1
 
     # directory patterns which install_data recognize
-    dir_patts = ['PREFIX', 'SYSCONFDIR', 'LOCALSTATEDIR', 'LIBEXECDIR',
+    dir_patts = ['PREFIX', 'SYSCONFDIR', 'APPCONFDIR', 'LOCALSTATEDIR', 'LIBEXECDIR',
             'LIBDIR', 'DATAROOTDIR', 'DATADIR', 'MANDIR', 'DOCDIR',
             'INFODIR', 'SBINDIR', 'BINDIR', 'LOCALEDIR', 'PYTHONDIR',
-            'PURELIBDIR', 'APPDIR', 'SRCDIR']
+            'PURELIBDIR', 'APPDIR', 'PUREPYAPPDIR', 'SRCDIR', 'FREDCONFDIR', 
+            'FREDCONFMODULEDIR', 'FREDAPPDIR']
 
     def __init__(self, *attrs):
         self.compile = 1
         self.optimize = 1
         _install_data.__init__(self, *attrs)
         install_parent.__init__(self, *attrs)
+        # cache for names of folders translated from proxy value
+        self.config_dirs = {
+            'APPCONFDIR': None, 
+            'FREDCONFDIR': None, 
+            'FREDCONFMODULEDIR': None, 
+        }
+
 
     def replaceSpecialDir(self, dir):
         """
@@ -130,17 +84,23 @@ class install_data(_install_data, install_parent):
         `/usr/local'. So whole path will be `/usr/local/etc/some_dir').
         Valid patterns are emplaced in self.`dir_patts' variable.
         """
+        keydir = dir
         for str in self.dir_patts:
             s = re.search("^"+str, dir)
             if s:
                 if self.is_wininst:
                     self.is_wininst = False
                     ret = os.path.join(self.getDir_noprefix(str.lower()), dir[s.end():].lstrip(os.path.sep))
-                    if str == 'SYSCONFDIR':
+                    if str in ('SYSCONFDIR', 'APPCONFDIR'):
                         ret = "+" + ret
                     self.is_wininst = True
                     return ret
-                dir = self.getDir(str.lower()) + dir[s.end():]
+                dir = self.getDir(str.lower(), install_data.NOT_ADD_ROOT) + dir[s.end():]
+        
+        # store translated value of the proxy dir
+        if keydir in self.config_dirs.keys():
+            self.config_dirs[keydir] = dir
+        
         return dir
 
     def initialize_options(self):
@@ -149,39 +109,12 @@ class install_data(_install_data, install_parent):
         self.prefix = None
         self.root = None
         self.record = None
+        self.include_eventd = None
 
     def finalize_options(self):
         _install_data.finalize_options(self)
         if 'install' in sys.argv:
-            self.set_undefined_options('install',
-                    ('root',                'root'),
-                    ('prefix',              'prefix'),
-                    ('record',              'record'),
-                    ('bindir',              'bindir'),
-                    ('sbindir',             'sbindir'),
-                    ('sysconfdir',          'sysconfdir'),
-                    ('libexecdir',          'libexecdir'),
-                    ('localstatedir',       'localstatedir'),
-                    ('libdir',              'libdir'),
-                    ('pythondir',           'pythondir'),
-                    ('purelibdir',          'purelibdir'),
-                    ('datarootdir',         'datarootdir'),
-                    ('datadir',             'datadir'),
-                    ('infodir',             'infodir'),
-                    ('mandir',              'mandir'),
-                    ('docdir',              'docdir'),
-                    ('localstatedir',       'localstatedir'),
-                    ('preservepath',        'preservepath'),
-                    ('no_record',           'no_record'),
-                    ('no_pycpyo',           'no_pycpyo'),
-                    ('no_check_deps',       'no_check_deps'),
-                    ('fgen_setupcfg',       'fgen_setupcfg'),
-                    ('no_update_setupcfg',  'no_update_setupcfg'),
-                    ('no_gen_setupcfg',     'no_gen_setupcfg'),
-                    ('no_setupcfg',         'no_setupcfg'),
-                    ('setupcfg_template',   'setupcfg_template'),
-                    ('setupcfg_output',     'setupcfg_output'),
-                    ('replace_path_rel',    'replace_path_rel'))
+            self.set_undefined_options('install', *[(k, k) for k in self.UNDEFINED_OPTIONS])
         else:
             install_parent.finalize_options(self)
         self.set_directories(self.prefix)
@@ -190,6 +123,62 @@ class install_data(_install_data, install_parent):
         self.srcdir = self.distribution.srcdir
         self.rundir = self.distribution.rundir
 
+
+    def dont_overwrite(self, src, dest):
+        "Check if is required the confirmation for overwriting the file"
+        
+        # do NOT use confirmation:
+        
+        if self.distribution.command_obj.get("bdist"):
+            return False # always overwrite file
+        
+        if self.prepare_debian_package:
+            # do not use confirmation during creation the DEB package
+            return False # always overwrite file
+        
+        # rmp calls: python setup.py install -cO2 --root=$RPM_BUILD_ROOT 
+        #                       --record=INSTALLED_FILES --preservepath
+        inst = self.distribution.command_obj.get("install")
+        if inst and inst.preservepath and inst.record == 'INSTALLED_FILES':
+            # do not use confirmation during creation the RMP package
+            return False # always overwrite file
+
+        # USE confirmation:
+        
+        # construct folders where are configuration files stored
+        confpaths = [
+            self.root and os.path.join(self.root, path.lstrip(os.path.sep)) 
+            or path for path in self.config_dirs.values() if path is not None]
+        configname = os.path.basename(src)
+        if dest in confpaths:
+            # destination is in folder where config files are,
+            # so we check if it is not duplicity
+            destpath = os.path.join(dest, configname)
+            # if file exists and is not same
+            if os.path.isfile(destpath) and not filecmp.cmp(src, destpath):
+                while 1:
+                    print """Configuration file `%s'
+ ==> Since the installation was changed (by you or the script).
+ ==> Distribution offers modified version.
+   What do you do? Possible options are:
+    Y or I : install the package version
+    N or O : keep the current version
+      D    : show the difference between the versions
+    Ctr+Z  : switch this process in the background (return back: 'fg')
+ The default action is to keep the current version.
+*** %s (Y/I/N/O/D/Z) [default=N] ?""" % (destpath, configname), 
+                    answer = raw_input()
+                    if answer == "" or answer in ("n", "N", "o", "O"):
+                        return True # don't overwrite
+                    if answer in ("y", "Y", "i", "I"):
+                        break # overwrite file
+                    if answer in ("d", "D"):
+                        # display difference and
+                        print os.popen("diff %s %s" % (src, destpath)).read()
+        
+        return False # overwrite file
+
+
     def run(self):
         #FREDDIST line added
         self.mkpath(self.install_dir)
@@ -197,7 +186,7 @@ class install_data(_install_data, install_parent):
         if self.no_pycpyo:
             self.compile = 0
             self.optimize = 0
-
+        
         for f in self.data_files:
             if type(f) is types.StringType:
                 #FREDDIST next line changed
@@ -207,9 +196,15 @@ class install_data(_install_data, install_parent):
                     self.warn("setup script did not provide a directory for "
                               "'%s' -- installing right in '%s'" %
                               (f, self.install_dir))
+                
+                # check if the confirmation is required
+                if self.dont_overwrite(f, self.install_dir):
+                    continue
+                
                 # it's a simple file, so copy it
                 (out, _) = self.copy_file(f, self.install_dir)
                 self.outfiles.append(out)
+                self.modify_file("install_data", f, self.install_dir)
 
                 if out.endswith('.py') and self.compile == 1:
                     os.system('python -c "import py_compile; \
@@ -224,6 +219,12 @@ class install_data(_install_data, install_parent):
             else:
                 # it's a tuple with path to install to and a list of files
                 dir = util.convert_path(self.replaceSpecialDir(f[0]))
+                
+                # do not include folder event.d
+                # if only the option --include-eventd is set
+                if not self.include_eventd and is_eventd.search(dir):
+                    continue
+                
                 if not os.path.isabs(dir):
                     if self.is_wininst and dir[0] == '+':
                         dir = os.path.join(self.install_dir[:self.install_dir.rfind(os.path.sep)], dir[1:])
@@ -246,8 +247,14 @@ class install_data(_install_data, install_parent):
                         if not os.path.exists(data):
                             data = util.convert_path(
                                     os.path.join(self.srcdir, data))
+                        
+                        # check if the confirmation is required
+                        if self.dont_overwrite(data, dir):
+                            continue
+                        
                         (out, _) = self.copy_file(data, dir)
                         self.outfiles.append(out)
+                        self.modify_file("install_data", data, dir)
                         if 'bin' in out.split(os.path.sep) or\
                                 'sbin' in out.split(os.path.sep) or\
                                 'init.d' in out.split(os.path.sep):

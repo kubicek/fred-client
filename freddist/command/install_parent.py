@@ -5,9 +5,25 @@ Parent class for all install* classes
 import re, os, sys
 from distutils.cmd import Command
 
+
 class install_parent(Command):
+
     user_options = []
     boolean_options = []
+    
+    PRESERVEPATH = True # constant for get_root(): self.get_root(self.PRESERVEPATH)
+
+    # Names of variables what will be copied into other classes 
+    # (install_data, install_lib, install_script) by function finalize_options()
+    UNDEFINED_OPTIONS = ('root', 'prefix', 'record', 'bindir', 'sbindir', 
+        'sysconfdir', 'appconfdir', 'libexecdir', 'localstatedir', 'libdir', 
+        'pythondir', 'purelibdir', 'datarootdir', 'datadir', 'infodir', 
+        'mandir', 'docdir', 'preservepath', 'no_record', 'no_pycpyo', 
+        'no_check_deps', 'fgen_setupcfg', 'no_update_setupcfg', 
+        'no_gen_setupcfg', 'no_setupcfg', 'setupcfg_template', 
+        'setupcfg_output', 'replace_path_rel', 'after_install', 
+        'prepare_debian_package', 'fredconfdir', 'fredconfmoduledir', 
+        'fredappdir', 'include_eventd', 'include_scripts')
 
     user_options.append(('bindir=', None,
         'user executables [PREFIX/bin]'))
@@ -15,6 +31,8 @@ class install_parent(Command):
         'system admin executables [PREFIX/sbin]'))
     user_options.append(('sysconfdir=', None, 
         'System configuration directory [PREFIX/etc]'))
+    user_options.append(('appconfdir=', None, 
+        'System configuration directory [fred] (sysconfdir/fred)'))
     user_options.append(('libexecdir=', None,
         'Program executables [PREFIX/libexec]'))
     user_options.append(('localstatedir=', None,
@@ -25,7 +43,7 @@ class install_parent(Command):
         'python directory [LIBDIR/python%d.%d]' %
         (sys.version_info[0], sys.version_info[1])))
     user_options.append(('purelibdir=', None,
-        'python pure libraries [LIBDIR/python%d.%d/site-packages]' %
+        'python pure libraries [LIBDIR/python%d.%d/(site-packages or dist-packages)]' %
         (sys.version_info[0], sys.version_info[1])))
     user_options.append(('datarootdir=', None,
         'read only architecture-independent data root [PREFIX/share]'))
@@ -36,7 +54,7 @@ class install_parent(Command):
     user_options.append(('mandir=', None,
         'man documentation [DATAROOTDIR/man]'))
     user_options.append(('docdir=', None,
-        'documentation root [DATAROOTDIR/doc/NAME]'))
+        'documentation root [DATAROOTDIR/doc/APPNAME]'))
     user_options.append(('localedir=', None,
         'locale-dependent data [DATAROOTDIR/locale]'))
 
@@ -63,7 +81,17 @@ class install_parent(Command):
         'output file with setup configuration [setup.cfg]'))
     user_options.append(('replace-path-rel', None,
         'When setup.py replace some path, replace it with relative path'))
-
+    user_options.append(('after-install', None,
+        'Do everything required after install (syncdb, loaddata)'))
+    user_options.append(('prepare-debian-package', None,
+        'Preparation for the debian package - create debian folder and copy files with modified paths.' \
+        ' Automaticly set on these options: --preservepath --no-compile --no-pycpyo'))
+    user_options.append(('include-eventd', None,
+        'Include event.d folder in doc folder.'))
+    user_options.append(('include-scripts', None,
+        'Include scripts folder.'))
+    
+    
     boolean_options.append('preservepath')
     boolean_options.append('no_record')
     boolean_options.append('no_pycpyo')
@@ -73,38 +101,63 @@ class install_parent(Command):
     boolean_options.append('no_gen_setupcfg')
     boolean_options.append('no_setupcfg')
     boolean_options.append('replace_path_rel')
+    boolean_options.append('after_install')
+    boolean_options.append('prepare_debian_package')
+    boolean_options.append('include_eventd')
+    boolean_options.append('include_scripts')
 
-    dirs = ['prefix', 'bindir', 'sbindir', 'sysconfdir', 'libexecdir',
+
+    dirs = ['prefix', 'bindir', 'sbindir', 'sysconfdir', 'appconfdir', 'libexecdir',
             'localstatedir', 'libdir', 'pythondir', 'purelibdir', 'datarootdir',
-            'datadir', 'infodir', 'mandir', 'docdir', 'localedir', 'appdir', 'srcdir']
-    # dirs = ['prefix', 'libexecdir', 'localstatedir', 'libdir', 'datarootdir',
-            # 'datadir', 'infodir', 'mandir', 'docdir', 'bindir', 'sbindir',
-            # 'localedir', 'pythondir', 'purelibdir']
+            'datadir', 'infodir', 'mandir', 'docdir', 'localedir', 
+            'appdir', 'purepyappdir', 'srcdir', 'fredconfdir', 
+            'fredconfmoduledir', 'fredappdir']
+
 
     def __init__(self, *attrs):
         self.is_bdist_mode = None
         self.is_wininst = False
+        self.install_purelib = None     # for pure module distributions
 
         for dist in attrs:
             for name in dist.commands:
-                if re.match('bdist', name): #'bdist' or 'bdist_rpm'
+                if re.match('bdist', name): #'bdist' or 'bdist_rpm' or 'bdist_deb'
                     self.is_bdist_mode = 1 #it is bdist mode - creating a package
                     break
             if self.is_bdist_mode:
                 break
+
 
     def get_actual_root(self):
         '''
         Return actual root only in case if the process is not in creation of
         the package
         '''
-        return ((self.is_bdist_mode or self.preservepath) and [''] or 
-                [type(self.root) is not None and self.root or ''])[0]
+        return "" if self.root is None \
+                        or self.preservepath \
+                        or self.is_bdist_mode \
+                  else \
+                        self.root
+    
+
+    def get_root(self, apply_preservepath=None):
+        "Return aways root except if the parameter apply_preservepath is set."
+        root = ''
+        if self.root is not None:
+            root = self.root
+        if apply_preservepath and (self.is_bdist_mode or self.preservepath):
+            root = '' # reset root
+        return root
+    
 
     def initialize_options(self):
+        self.prefix         = None
+        self.root           = None
+        
         self.bindir         = None
         self.sbindir        = None
         self.sysconfdir     = None
+        self.appconfdir     = None
         self.libexecdir     = None
         self.localstatedir  = None
         self.libdir         = None
@@ -113,10 +166,14 @@ class install_parent(Command):
         self.datarootdir    = None
         self.datadir        = None
         self.appdir         = None
+        self.purepyappdir   = None
         self.infodir        = None
         self.mandir         = None
         self.docdir         = None
         self.localedir      = None
+        self.fredconfdir    = None
+        self.fredconfmoduledir = None
+        self.fredappdir     = None
 
         self.preservepath   = None
         self.no_record      = None
@@ -130,85 +187,102 @@ class install_parent(Command):
         self.setupcfg_template  = None
         self.setupcfg_output    = None
         self.replace_path_rel   = None
+        self.after_install = None
+        self.prepare_debian_package = None
+        self.fred_distutils_dir = None
+        self.include_eventd = None
+        self.include_scripts = None
+
+
+    def set_option_values(self):
+        "Set values options"
+        
+        if self.root and self.prefix and self.prefix[0] != '/':
+            # prefix must start with slash if the root is set
+            # otherwise the prefix is duplicated
+            self.prefix = '/' + self.prefix
+        
+        if not self.bindir:
+            self.bindir = os.path.join(self.prefix, 'bin')
+        if not self.sbindir:
+            self.sbindir = os.path.join(self.prefix, 'sbin')
+        if not self.sysconfdir:
+            self.sysconfdir = os.path.join(self.prefix, 'etc')
+        
+        if not self.appconfdir:
+            # 'fred' or self.distribution.metadata.name
+            self.appconfdir = os.path.join(self.sysconfdir, 'fred')
+        else:
+            if self.appconfdir[0] != "/":
+                self.appconfdir = os.path.join(self.sysconfdir, self.appconfdir)
+        
+        if not self.libexecdir:
+            self.libexecdir = os.path.join(self.prefix, 'libexec')
+        if not self.localstatedir:
+            self.localstatedir = os.path.join(self.prefix, 'var')
+        if not self.libdir:
+            self.libdir = os.path.join(self.prefix, 'lib')
+        if not self.pythondir:
+            self.pythondir = os.path.join(self.libdir, 'python%d.%d' % 
+                    (sys.version_info[0], sys.version_info[1]))
+        if not self.purelibdir:
+            self.purelibdir = os.path.join(self.pythondir, self.get_site_packages_name())
+        if not self.datarootdir:
+            self.datarootdir = os.path.join(self.prefix, 'share')
+        if not self.datadir:
+            self.datadir = self.datarootdir
+        if not self.appdir:
+            self.appdir = os.path.join(self.datadir, self.distribution.metadata.name)
+        if not self.purepyappdir:
+            self.purepyappdir = os.path.join(self.purelibdir, self.distribution.metadata.name)
+        if not self.infodir:
+            self.infodir = os.path.join(self.datarootdir, 'info')
+        if not self.mandir:
+            self.mandir = os.path.join(self.datarootdir, 'man')
+        if not self.docdir:
+            self.docdir = os.path.join(
+                    self.datarootdir, 'doc', self.distribution.metadata.name)
+        if not self.localedir:
+            self.localedir = os.path.join(self.datarootdir, 'locale')
+        # if self.fredconfdir is None:
+        #   is defined in freddist.nicms.install_module
+        
+        # --prepare-debian-package set on these options automaticly:
+        if self.prepare_debian_package:
+            self.no_compile = True
+            self.no_pycpyo = True
+            self.preservepath = True
+            self.no_check_deps = True
+
+        if self.after_install:
+            # scripts must be included if you want run them after installation
+            self.include_scripts = True
+
+
+    def get_site_packages_name(self):
+        "Returns actual name 'site_packages' (Can be also 'dist-packages')"
+        if self.install_purelib is None:
+            return ''
+        return self.install_purelib.split('/')[-1]
+
 
     def finalize_options(self):
         self.srcdir = self.distribution.srcdir
         if not self.prefix:
             # prefix is empty - set it to the default value
             self.prefix = os.path.join('/', 'usr', 'local')
-        if not self.bindir:
-            self.bindir = os.path.join(self.prefix, 'bin')
-        if not self.sbindir:
-            self.sbindir = os.path.join(self.prefix, 'sbin')
-        if not self.sysconfdir:
-            self.sysconfdir = os.path.join(self.prefix, 'etc')
-        if not self.libexecdir:
-            self.libexecdir = os.path.join(self.prefix, 'libexec')
-        if not self.localstatedir:
-            self.localstatedir = os.path.join(self.prefix, 'var')
-        if not self.libdir:
-            self.libdir = os.path.join(self.prefix, 'lib')
-        if not self.pythondir:
-            self.pythondir = os.path.join(self.libdir, 'python%d.%d' % 
-                    (sys.version_info[0], sys.version_info[1]))
-        if not self.purelibdir:
-            self.purelibdir = os.path.join(self.pythondir, 'site-packages')
-        if not self.datarootdir:
-            self.datarootdir = os.path.join(self.prefix, 'share')
-        if not self.datadir:
-            self.datadir = self.datarootdir
-        if not self.appdir:
-            self.appdir = os.path.join(self.datadir, self.distribution.metadata.name)
-        if not self.infodir:
-            self.infodir = os.path.join(self.datarootdir, 'info')
-        if not self.mandir:
-            self.mandir = os.path.join(self.datarootdir, 'man')
-        if not self.docdir:
-            self.docdir = os.path.join(
-                    self.datarootdir, 'doc', self.distribution.metadata.name)
-        if not self.localedir:
-            self.localedir = os.path.join(self.datarootdir, 'locale')
+        self.set_option_values()
         if not self.setupcfg_template:
             self.setupcfg_template = 'setup.cfg.template'
         if not self.setupcfg_output:
             self.setupcfg_output = 'setup.cfg'
 
+
     def set_directories(self, prefix=None):
         if prefix:
             self.prefix = prefix
+        self.set_option_values()
 
-        if not self.bindir:
-            self.bindir = os.path.join(self.prefix, 'bin')
-        if not self.sbindir:
-            self.sbindir = os.path.join(self.prefix, 'sbin')
-        if not self.sysconfdir:
-            self.sysconfdir = os.path.join(self.prefix, 'etc')
-        if not self.libexecdir:
-            self.libexecdir = os.path.join(self.prefix, 'libexec')
-        if not self.localstatedir:
-            self.localstatedir = os.path.join(self.prefix, 'var')
-        if not self.libdir:
-            self.libdir = os.path.join(self.prefix, 'lib')
-        if not self.pythondir:
-            self.pythondir = os.path.join(self.libdir, 'python%d.%d' % 
-                    (sys.version_info[0], sys.version_info[1]))
-        if not self.purelibdir:
-            self.purelibdir = os.path.join(self.pythondir, 'site-packages')
-        if not self.datarootdir:
-            self.datarootdir = os.path.join(self.prefix, 'share')
-        if not self.datadir:
-            self.datadir = self.datarootdir
-        if not self.appdir:
-            self.appdir = os.path.join(self.datadir, self.distribution.metadata.name)
-        if not self.infodir:
-            self.infodir = os.path.join(self.datarootdir, 'info')
-        if not self.mandir:
-            self.mandir = os.path.join(self.datarootdir, 'man')
-        if not self.docdir:
-            self.docdir = os.path.join(
-                    self.datarootdir, 'doc', self.distribution.metadata.name)
-        if not self.localedir:
-            self.localedir = os.path.join(self.datarootdir, 'locale')
 
     def replace_pattern(self, fileOpen, fileSave=None, values = []):
         """
@@ -231,7 +305,7 @@ class install_parent(Command):
             pass
         open(fileSave, 'w').write(body)
 
-    def getDir(self, directory):
+    def getDir(self, directory, no_add_root=None):
         """
         Method returs actual value of some system directory and if needed it
         prepend self.root path (depend on preservepath option).
@@ -242,10 +316,11 @@ class install_parent(Command):
             dir = getattr(self, directory.lower())
         except AttributeError:
             return ''
+        if no_add_root is not None:
+            return dir
         if self.get_actual_root():
             return os.path.join(self.root, dir.lstrip(os.path.sep))
-        else:
-            return dir
+        return dir
 
     def getDir_nop(self, directory):
         """
@@ -335,3 +410,19 @@ class install_parent(Command):
                     record.append(file)
             open(self.record, 'w').writelines(record)
             print "record file has been updated"
+
+    
+    def modify_file(self, command, filename, targetpath):
+        "Modify file if any function is defined."
+        if not hasattr(self.distribution, "modify_files"):
+            return
+        
+        # modify_files: {"command": 
+        #                 (("module.function", ("filename", ...)), ...), ...}
+        for mfncname, files in self.distribution.modify_files.get(command, []):
+            modulename, fncname = mfncname.split(".")
+            fnc = getattr(self.distribution.command_obj[modulename], fncname)
+            for name in files:
+                if re.search("%s$" % name, filename):
+                    # modify file by fnc(SRC, DEST) from SRC to DEST
+                    fnc(filename, os.path.join(targetpath, name))

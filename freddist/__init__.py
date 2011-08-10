@@ -1,6 +1,4 @@
-__all__ = [
-        'command',
-        'core.py',
-        'dist.py',
-        'file_util.py',
-        ]
+# git-buildpackage is stupid
+import sys
+if sys.version_info < (2, 5):
+    raise SystemExit("Must use python 2.5 or greater")

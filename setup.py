@@ -19,6 +19,7 @@
 import sys, os, shutil
 from distutils import log
 from freddist.core import setup
+from freddist.command.sdist import sdist
 from freddist.command.install import install
 from freddist.command.install_scripts import install_scripts
 from freddist.command.install_lib import install_lib
@@ -45,7 +46,17 @@ if 'bdist_wininst' in sys.argv:
     APP_SCRIPTS.append('setup_postinstall.py')
 
 
+class EPPClientSDist(sdist):
+    "sdist check required"
     
+    def run(self):
+        "run main process"
+        if not os.path.exists(os.path.join(self.srcdir, 'freddist')):
+            raise IOError(2, 'Folder freddist missing. Make symlink or copy '
+                             'from enum/distutils.')
+        sdist.run(self)
+    
+
 class EPPClientInstall(install):
 
     user_options = install.user_options
@@ -79,6 +90,7 @@ class EPPClientInstall(install):
         install.initialize_options(self)
         self.host = None
         self.port = None
+        self.include_scripts = True
 
     def finalize_options(self):
         install.finalize_options(self)
@@ -218,6 +230,7 @@ def main(directory):
                 os.path.join('DATADIR', 'fred-client', 'schemas'),
                 os.path.join(directory, 'fred', 'schemas')),
             cmdclass = {
+                    'sdist': EPPClientSDist, 
                     'install': EPPClientInstall, 
                     'install_scripts': EPPClientInstall_scripts,
                     'install_lib':Install_lib,
@@ -225,9 +238,17 @@ def main(directory):
                 }, 
             )
         return True
-    except Exception, e:
-        log.error("Error: %s", e)
+    except OSError, msg:
+        message = "%s" % msg
+        log.error("OSError: %s.", message)
+        if 'schemas' in message:
+            log.error("Schemas missing. Use them from the project mod-eppd and "
+                      "copy or make symlink fred/schemas.")
         return False
+    except Exception, msg:
+        log.error("Error: %s", msg)
+        return False
+
 if __name__ == '__main__':
     g_directory = os.path.dirname(sys.argv[0])
     filename = 'fred-client.py'
