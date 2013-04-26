@@ -1,3 +1,37 @@
+2012-04-30 Jiri Sadek (version 2.3.1)
+
+	* update contact.xsd
+	   - info result can contain addr in disclose flags
+	   - new states can appear in info result:
+	      - conditionallyIdentifiedContact
+	      - identifiedContact
+	      - deleteCandidate
+
+	* update domain.xsd
+	   - new states can appear in info result:
+	      - deleteCandidate
+
+	* update nsset.xsd
+	   - new states can appear in info result:
+	      - deleteCandidate
+
+	* update keyset.xsd
+	   - new states can appear in info result:
+	      - deleteCandidate
+
+2011-06-08 Jiri Sadek (version 2.3.0)
+
+	* update fred.xsd from 1.4 to 1.5
+	   - added requestFeeInfo poll message datatype
+
+	* update fredcom.xsd from 1.1 to 1.2
+	   - changed objIDType (contact, nsset, keyset handle type)
+	     minimal lenght to 1
+
+	* valExDate element is optional in enumval extension
+
+	* update all.xsd from 2.2 to 2.3
+
 2009-11-26 Jiri Sadek (version 2.2.0)
 
 	* update contact.xsd from 1.5 to 1.6

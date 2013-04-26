@@ -3,7 +3,7 @@
   <schema targetNamespace="http://www.nic.cz/xml/epp/contact-1.6"
           xmlns:contact="http://www.nic.cz/xml/epp/contact-1.6"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
-          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
+          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.2"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
 
@@ -15,8 +15,8 @@
     -->
     <import namespace="urn:ietf:params:xml:ns:eppcom-1.0"
             schemaLocation="eppcom-1.0.xsd"/>
-    <import namespace="http://www.nic.cz/xml/epp/fredcom-1.1"
-            schemaLocation="fredcom-1.1.xsd"/>
+    <import namespace="http://www.nic.cz/xml/epp/fredcom-1.2"
+            schemaLocation="fredcom-1.2.0.xsd"/>
 
     <annotation>
       <documentation>
@@ -179,6 +179,22 @@
 <!--        <element name="name" minOccurs="0"/> -->
 <!--        <element name="org" minOccurs="0"/> -->
 <!--        <element name="addr" minOccurs="0"/>  -->
+        <element name="voice" minOccurs="0"/>
+        <element name="fax" minOccurs="0"/>
+        <element name="email" minOccurs="0"/>
+        <element name="vat" minOccurs="0"/>
+        <element name="ident" minOccurs="0"/>
+        <element name="notifyEmail" minOccurs="0"/>
+      </sequence>
+      <attribute name="flag" type="boolean" use="required"/>
+    </complexType>
+
+    <!--
+    XXX: temporarily we will have different discloseType for info command result
+    -->
+    <complexType name="infDiscloseType">
+      <sequence>
+        <element name="addr" minOccurs="0"/>
         <element name="voice" minOccurs="0"/>
         <element name="fax" minOccurs="0"/>
         <element name="email" minOccurs="0"/>
@@ -389,7 +405,7 @@
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
-        <element name="disclose" type="contact:discloseType"
+        <element name="disclose" type="contact:infDiscloseType"
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"
          minOccurs="0"/>
@@ -422,6 +438,9 @@
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
+        <enumeration value="deleteCandidate"/>
+        <enumeration value="conditionallyIdentifiedContact"/>
+        <enumeration value="identifiedContact"/>
       </restriction>
     </simpleType>
 
